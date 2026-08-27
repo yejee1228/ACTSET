@@ -8,20 +8,9 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 public interface JobRepository extends JpaRepository<Job, UUID> {
-
-    /** FOR UPDATE SKIP LOCKED로 대기 작업 1건을 점유한다(docs/10). */
-    @Query(value = """
-            SELECT * FROM jobs WHERE id = (
-              SELECT id FROM jobs WHERE status = 'pending'
-              ORDER BY created_at
-              FOR UPDATE SKIP LOCKED LIMIT 1
-            )
-            """, nativeQuery = true)
-    Optional<Job> claimNextPending();
 
     List<Job> findByParentJobId(UUID parentJobId);
 
