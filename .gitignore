@@ -27,7 +27,7 @@ dist/
 tools/
 
 # 로컬 파일 스토리지 (S3 대체 — StorageService 로컬 구현 산출물)
-storage/
+/storage/
 
 # 프런트 빌드 산출물이 백엔드 static/으로 복사되기 전 중간 산출물
 frontend/dist/

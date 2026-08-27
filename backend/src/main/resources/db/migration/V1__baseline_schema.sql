@@ -29,7 +29,7 @@ CREATE TABLE accounts (
 -- 2. projects ------------------------------------------------------------
 CREATE TABLE projects (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    owner_id            uuid NOT NULL REFERENCES accounts(id),
+    owner_id            uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     status              text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','deleted')),
     deleted_at          timestamptz,
     main_title          text NOT NULL DEFAULT '',
@@ -56,7 +56,7 @@ CREATE INDEX idx_projects_owner ON projects (owner_id);
 -- 4. generated_assets ------------------------------------------------------
 CREATE TABLE generated_assets (
     id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id          uuid NOT NULL REFERENCES projects(id),
+    project_id          uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     category            text NOT NULL CHECK (category IN ('시안후보','포스터','규격변환','추가제작물')),
     format_code         text NOT NULL,
     width               integer NOT NULL,
@@ -87,7 +87,7 @@ CREATE INDEX idx_assets_purge ON generated_assets (deleted_at)
 -- 9. uploaded_files --------------------------------------------------------
 CREATE TABLE uploaded_files (
     id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id    uuid NOT NULL REFERENCES projects(id),
+    project_id    uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
     kind          text NOT NULL CHECK (kind IN ('performance_photo','cast_photo','logo','reference_image')),
     storage_path  text NOT NULL,
     mime_type     text,
@@ -100,14 +100,14 @@ CREATE INDEX idx_uploaded_files_project ON uploaded_files (project_id);
 -- 7. jobs --------------------------------------------------------------
 CREATE TABLE jobs (
     id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id      uuid REFERENCES projects(id),
+    project_id      uuid REFERENCES projects(id) ON DELETE CASCADE,
     kind            text NOT NULL CHECK (kind IN ('draft_generate','decompose_layers','recompose','resync','render_print','zip_download','analyze_poster')),
     status          text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','running','succeeded','failed','canceled')),
     payload         jsonb,
     result          jsonb,
     error           text,
     attempts        smallint NOT NULL DEFAULT 0,
-    parent_job_id   uuid REFERENCES jobs(id),
+    parent_job_id   uuid REFERENCES jobs(id) ON DELETE CASCADE,
     locked_at       timestamptz,
     created_at      timestamptz NOT NULL DEFAULT now(),
     updated_at      timestamptz NOT NULL DEFAULT now()
@@ -120,12 +120,12 @@ CREATE INDEX idx_jobs_parent ON jobs (parent_job_id);
 -- 6-2. credit_transactions -------------------------------------------------
 CREATE TABLE credit_transactions (
     id             bigserial PRIMARY KEY,
-    account_id     uuid NOT NULL REFERENCES accounts(id),
+    account_id     uuid NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
     type           text NOT NULL CHECK (type IN ('signup_grant','purchase','consume','refund','admin_grant')),
     amount         integer NOT NULL CHECK (amount <> 0),
     balance_after  integer NOT NULL,
-    job_id         uuid REFERENCES jobs(id),
-    actor_id       uuid REFERENCES accounts(id),
+    job_id         uuid REFERENCES jobs(id) ON DELETE CASCADE,
+    actor_id       uuid REFERENCES accounts(id) ON DELETE SET NULL,
     description    text,
     created_at     timestamptz NOT NULL DEFAULT now()
 );
@@ -155,8 +155,8 @@ CREATE INDEX idx_sel_project ON selection_events (project_id, created_at);
 -- 8. print_order_drafts ----------------------------------------------------
 CREATE TABLE print_order_drafts (
     id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    project_id            uuid NOT NULL REFERENCES projects(id),
-    generated_asset_id    uuid REFERENCES generated_assets(id),
+    project_id            uuid NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    generated_asset_id    uuid REFERENCES generated_assets(id) ON DELETE SET NULL,
     print_spec            jsonb,
     shipping_address      jsonb,
     estimated_price       integer,
