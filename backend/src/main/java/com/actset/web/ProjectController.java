@@ -2,6 +2,7 @@ package com.actset.web;
 
 import com.actset.domain.Project;
 import com.actset.security.CurrentUser;
+import com.actset.service.ConfirmService;
 import com.actset.service.ProjectInfoService;
 import com.actset.service.ProjectService;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -20,10 +21,13 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final ProjectInfoService projectInfoService;
+    private final ConfirmService confirmService;
 
-    public ProjectController(ProjectService projectService, ProjectInfoService projectInfoService) {
+    public ProjectController(ProjectService projectService, ProjectInfoService projectInfoService,
+                              ConfirmService confirmService) {
         this.projectService = projectService;
         this.projectInfoService = projectInfoService;
+        this.confirmService = confirmService;
     }
 
     @PostMapping
@@ -64,6 +68,19 @@ public class ProjectController {
         } else {
             body.put("poster_resync", Map.of());
         }
+        return body;
+    }
+
+    public record ConfirmRequest(UUID selected_candidate_id) {
+    }
+
+    @PostMapping("/{id}/confirm")
+    public Map<String, Object> confirm(@PathVariable UUID id, @RequestBody ConfirmRequest req) {
+        ConfirmService.ConfirmResult result = confirmService.confirm(id, CurrentUser.id(), req.selected_candidate_id());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", "active");
+        body.put("poster_asset_id", result.posterAssetId().toString());
+        body.put("confirmed_at", result.confirmedAt().toString());
         return body;
     }
 }
