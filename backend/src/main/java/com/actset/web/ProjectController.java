@@ -2,7 +2,9 @@ package com.actset.web;
 
 import com.actset.domain.Project;
 import com.actset.security.CurrentUser;
+import com.actset.service.ProjectInfoService;
 import com.actset.service.ProjectService;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,15 +13,17 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** docs/11 Stage 1 프로젝트. 목록·정보수정 등은 1-6·1-7에서 확장한다. */
+/** docs/11 Stage 1 프로젝트. 목록 등은 1-6에서 확장한다. */
 @RestController
 @RequestMapping("/api/v1/projects")
 public class ProjectController {
 
     private final ProjectService projectService;
+    private final ProjectInfoService projectInfoService;
 
-    public ProjectController(ProjectService projectService) {
+    public ProjectController(ProjectService projectService, ProjectInfoService projectInfoService) {
         this.projectService = projectService;
+        this.projectInfoService = projectInfoService;
     }
 
     @PostMapping
@@ -46,6 +50,20 @@ public class ProjectController {
         flags.put("date_undetermined", project.isDateUndetermined());
         flags.put("venue_undetermined", project.isVenueUndetermined());
         body.put("flags", flags);
+        return body;
+    }
+
+    @PatchMapping("/{id}/info")
+    public Map<String, Object> updateInfo(@PathVariable UUID id, @RequestBody JsonNode partial) {
+        Project project = projectService.getOwned(id, CurrentUser.id());
+        ProjectInfoService.UpdateResult result = projectInfoService.update(project, partial);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("updated_at", result.updatedAt().toString());
+        if (result.posterResyncJobId() != null) {
+            body.put("poster_resync", Map.of("job_id", result.posterResyncJobId().toString()));
+        } else {
+            body.put("poster_resync", Map.of());
+        }
         return body;
     }
 }
