@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Header } from '../components/Header';
-import { api, FormatPresetDto } from '../lib/api';
+import { api, ApiError, FormatPresetDto } from '../lib/api';
 
 const GROUP_LABELS: Record<string, string> = {
   예매처: '예매처', 온라인: '온라인', 오프라인: '오프라인',
@@ -14,16 +14,28 @@ export default function Step5FormatSelectionPage() {
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
   const { data } = useQuery({
     queryKey: ['formats'],
     queryFn: () => api.get<{ items: FormatPresetDto[] }>('/formats'),
   });
 
+  const codes = Array.from(selected);
+  const { data: estimate } = useQuery({
+    queryKey: ['creditsEstimate', 'recompose', codes.join(',')],
+    queryFn: () => api.get<{ estimated_cost: number; balance: number; sufficient: boolean }>(
+      `/credits/estimate?kind=recompose&variants=3&${codes.map((c) => `format_codes=${encodeURIComponent(c)}`).join('&')}`,
+    ),
+    enabled: codes.length > 0,
+  });
+
   const requestRecompose = useMutation({
     mutationFn: () => api.post<{ job_id: string }>(`/projects/${id}/recompose`, {
-      format_codes: Array.from(selected), variants_per_format: 3,
+      format_codes: codes, variants_per_format: 3,
     }),
     onSuccess: (res) => navigate(`/projects/${id}/recompose-results?job=${res.job_id}`),
+    onError: (err) => setSubmitError(err instanceof ApiError ? err.message : '요청에 실패했습니다.'),
   });
 
   const items = (data?.items ?? []).filter((f) => f.code !== 'POSTER');
@@ -66,8 +78,18 @@ export default function Step5FormatSelectionPage() {
           </div>
         ))}
 
-        <button className="btn btn-primary" disabled={selected.size === 0 || requestRecompose.isPending}
-                onClick={() => requestRecompose.mutate()}>
+        {estimate && (
+          <p className="body-sm" style={{ marginBottom: 'var(--sp-3)', color: estimate.sufficient ? 'var(--gray-warm)' : 'var(--error)' }}>
+            예상 소비 크레딧 {estimate.estimated_cost.toLocaleString()} · 보유 {estimate.balance.toLocaleString()}
+            {!estimate.sufficient && ' — 크레딧이 부족합니다.'}
+          </p>
+        )}
+        {submitError && (
+          <p className="body-sm" style={{ marginBottom: 'var(--sp-3)', color: 'var(--error)' }}>{submitError}</p>
+        )}
+        <button className="btn btn-primary"
+                disabled={selected.size === 0 || requestRecompose.isPending || (estimate ? !estimate.sufficient : false)}
+                onClick={() => { setSubmitError(null); requestRecompose.mutate(); }}>
           일괄변환 생성 ({selected.size}종)
         </button>
       </div>

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
-import { api, AssetItem, JobStatus } from '../lib/api';
+import { api, ApiError, AssetItem, JobStatus } from '../lib/api';
 
 /** ③ 시안 선택 화면(1-12·1-13). 시안 3장이 화면의 대부분을 차지한다(docs/16). */
 export default function Step3DraftSelectionPage() {
@@ -10,7 +10,13 @@ export default function Step3DraftSelectionPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [jobStatus, setJobStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const startedRef = useRef(false);
+
+  const { data: estimate } = useQuery({
+    queryKey: ['creditsEstimate', 'draft_generate'],
+    queryFn: () => api.get<{ estimated_cost: number; balance: number; sufficient: boolean }>('/credits/estimate?kind=draft_generate&variants=3'),
+  });
 
   const { data: assetData, refetch: refetchAssets } = useQuery({
     queryKey: ['assets', id, '시안후보'],
@@ -39,19 +45,25 @@ export default function Step3DraftSelectionPage() {
   }
 
   async function generate(mode: 'initial' | 'regenerate' | 'new_direction' | 'more_like', referenceId?: string) {
-    // 액션 발생 시점에 화면에 표시 중이던 후보 전체를 shown_candidates로 함께 기록한다(docs/02 핵심).
-    if (mode !== 'initial' && id) {
-      await api.post(`/projects/${id}/selection-events`, {
-        screen: '시안선택',
-        action: mode === 'regenerate' ? 'regenerate' : mode === 'new_direction' ? 'view_more_direction' : 'more_like_this',
-        shown_candidates: candidates.map((c) => ({ candidate_id: c.id, generation_params: {} })),
-        selected_candidate_id: null,
+    setErrorMessage(null);
+    try {
+      // 액션 발생 시점에 화면에 표시 중이던 후보 전체를 shown_candidates로 함께 기록한다(docs/02 핵심).
+      if (mode !== 'initial' && id) {
+        await api.post(`/projects/${id}/selection-events`, {
+          screen: '시안선택',
+          action: mode === 'regenerate' ? 'regenerate' : mode === 'new_direction' ? 'view_more_direction' : 'more_like_this',
+          shown_candidates: candidates.map((c) => ({ candidate_id: c.id, generation_params: {} })),
+          selected_candidate_id: null,
+        });
+      }
+      const { job_id } = await api.post<{ job_id: string }>(`/projects/${id}/drafts`, {
+        mode, count: 3, reference_candidate_id: referenceId,
       });
+      await pollJob(job_id);
+    } catch (err) {
+      setJobStatus('failed');
+      setErrorMessage(err instanceof ApiError ? err.message : '요청에 실패했습니다.');
     }
-    const { job_id } = await api.post<{ job_id: string }>(`/projects/${id}/drafts`, {
-      mode, count: 3, reference_candidate_id: referenceId,
-    });
-    await pollJob(job_id);
   }
 
   useEffect(() => {
@@ -96,10 +108,16 @@ export default function Step3DraftSelectionPage() {
         {jobStatus === 'failed' && (
           <div className="card" style={{ padding: 'var(--sp-5)', borderColor: 'var(--error)' }}>
             <p className="body-sm" style={{ color: 'var(--error)', marginBottom: 'var(--sp-3)' }}>
-              시안 생성에 실패했습니다. 사용된 크레딧은 자동으로 환불되었습니다.
+              {errorMessage ?? '시안 생성에 실패했습니다. 사용된 크레딧은 자동으로 환불되었습니다.'}
             </p>
-            <button className="btn btn-secondary" onClick={() => generate('initial')}>다시 시도</button>
+            <button className="btn btn-secondary" onClick={() => generate(candidates.length === 0 ? 'initial' : 'regenerate')}>다시 시도</button>
           </div>
+        )}
+        {estimate && jobStatus !== 'failed' && (
+          <p className="caption" style={{ marginTop: 'var(--sp-2)', color: estimate.sufficient ? 'var(--gray-warm)' : 'var(--error)' }}>
+            시안 3장 생성 시 예상 소비 {estimate.estimated_cost.toLocaleString()} 크레딧 · 보유 {estimate.balance.toLocaleString()}
+            {!estimate.sufficient && ' — 크레딧이 부족합니다.'}
+          </p>
         )}
 
         {candidates.length > 0 && (

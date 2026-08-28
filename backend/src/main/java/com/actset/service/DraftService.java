@@ -9,7 +9,6 @@ import com.actset.worker.JobService;
 import org.springframework.http.HttpStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,19 +28,18 @@ public class DraftService {
     private final ObjectMapper objectMapper;
     private final ContentModerationAdapter contentModerationAdapter;
     private final CostCapService costCapService;
-
-    @Value("${actset.credit.cost-per-draft-image:10}")
-    private int costPerImage;
+    private final CostEstimateService costEstimateService;
 
     public DraftService(ProjectService projectService, JobService jobService, CreditService creditService,
                          ObjectMapper objectMapper, ContentModerationAdapter contentModerationAdapter,
-                         CostCapService costCapService) {
+                         CostCapService costCapService, CostEstimateService costEstimateService) {
         this.projectService = projectService;
         this.jobService = jobService;
         this.creditService = creditService;
         this.objectMapper = objectMapper;
         this.contentModerationAdapter = contentModerationAdapter;
         this.costCapService = costCapService;
+        this.costEstimateService = costEstimateService;
     }
 
     @Transactional
@@ -63,7 +61,7 @@ public class DraftService {
         payload.put("count", count);
 
         Job job = jobService.enqueue("draft_generate", project.getId(), payload);
-        int cost = costPerImage * count;
+        int cost = costEstimateService.draftCost(count);
         creditService.consume(ownerId, cost, job.getId(), "시안 생성 " + count + "장(" + mode + ")");
         return job.getId();
     }

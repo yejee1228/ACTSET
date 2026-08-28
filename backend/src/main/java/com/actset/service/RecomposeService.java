@@ -7,7 +7,6 @@ import com.actset.format.FormatPreset;
 import com.actset.worker.JobService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,16 +27,15 @@ public class RecomposeService {
     private final JobService jobService;
     private final CreditService creditService;
     private final ObjectMapper objectMapper;
-
-    @Value("${actset.credit.cost-per-format-recompose:5}")
-    private int costPerFormat;
+    private final CostEstimateService costEstimateService;
 
     public RecomposeService(ProjectService projectService, JobService jobService, CreditService creditService,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper, CostEstimateService costEstimateService) {
         this.projectService = projectService;
         this.jobService = jobService;
         this.creditService = creditService;
         this.objectMapper = objectMapper;
+        this.costEstimateService = costEstimateService;
     }
 
     public record ChildJob(UUID jobId, String formatCode) {
@@ -87,7 +85,7 @@ public class RecomposeService {
             payload.put("variants", variantsPerFormat);
 
             Job child = jobService.enqueue("recompose", projectId, payload, parent.getId());
-            creditService.consume(ownerId, costPerFormat, child.getId(), "규격 변환 " + code);
+            creditService.consume(ownerId, costEstimateService.recomposeCostPerFormat(), child.getId(), "규격 변환 " + code);
             children.add(new ChildJob(child.getId(), code));
         }
 

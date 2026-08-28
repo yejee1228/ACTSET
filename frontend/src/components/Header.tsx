@@ -28,9 +28,9 @@ export function Header() {
       </Link>
       {account && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)' }}>
-          <span className="body-sm tabular">
+          <Link to="/credits" className="body-sm tabular" style={{ textDecoration: 'none' }}>
             크레딧 <strong className="body-strong" style={{ color: 'var(--orange-text)' }}>{account.credit_balance.toLocaleString()}</strong>
-          </span>
+          </Link>
           <Link to="/account" className="body-sm" style={{ color: 'var(--gray-warm)', textDecoration: 'none' }}>
             계정 설정
           </Link>

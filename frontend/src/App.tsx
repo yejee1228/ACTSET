@@ -16,6 +16,7 @@ import ProjectDashboardPage from './pages/ProjectDashboardPage';
 import InfoEditPage from './pages/InfoEditPage';
 import PrintPage from './pages/PrintPage';
 import AccountSettingsPage from './pages/AccountSettingsPage';
+import CreditsPage from './pages/CreditsPage';
 import AdminPage from './pages/AdminPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { RequireAuth } from './components/RequireAuth';
@@ -35,6 +36,7 @@ export default function App() {
 
         <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
         <Route path="/account" element={<RequireAuth><AccountSettingsPage /></RequireAuth>} />
+        <Route path="/credits" element={<RequireAuth><CreditsPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
 
         <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
