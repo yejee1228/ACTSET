@@ -12,6 +12,7 @@ import Step4ConfirmPage from './pages/Step4ConfirmPage';
 import Step4bNextActionPage from './pages/Step4bNextActionPage';
 import StubPage from './pages/StubPage';
 import AccountSettingsPage from './pages/AccountSettingsPage';
+import AdminPage from './pages/AdminPage';
 import { RequireAuth } from './components/RequireAuth';
 
 export default function App() {
@@ -25,6 +26,7 @@ export default function App() {
 
       <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
       <Route path="/account" element={<RequireAuth><AccountSettingsPage /></RequireAuth>} />
+      <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
 
       <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
       <Route path="/projects/:id/additional" element={<RequireAuth><Step2AdditionalInfoPage /></RequireAuth>} />
