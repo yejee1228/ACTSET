@@ -36,6 +36,15 @@ public class GeneratedAssetService {
     public GeneratedAsset saveCandidate(UUID projectId, String formatCode, int width, int height,
                                           int variantIndex, byte[] baseImage, BufferedImage rendered,
                                           JsonNode objectMap, JsonNode generationParams) {
+        return saveCandidate(projectId, "시안후보", formatCode, width, height, variantIndex,
+                baseImage, rendered, objectMap, generationParams);
+    }
+
+    /** category를 직접 지정하는 버전 — 규격변환(3-2)은 '규격변환'으로, 시안 생성(1-11)은 '시안후보'로 저장한다. */
+    @Transactional
+    public GeneratedAsset saveCandidate(UUID projectId, String category, String formatCode, int width, int height,
+                                          int variantIndex, byte[] baseImage, BufferedImage rendered,
+                                          JsonNode objectMap, JsonNode generationParams) {
         UUID assetId = UUID.randomUUID();
         String basePath = "projects/" + projectId + "/base/" + assetId + ".jpg";
         String renderPath = "projects/" + projectId + "/render/" + assetId + ".jpg";
@@ -50,7 +59,7 @@ public class GeneratedAssetService {
         GeneratedAsset asset = new GeneratedAsset();
         asset.setId(assetId);
         asset.setProjectId(projectId);
-        asset.setCategory("시안후보");
+        asset.setCategory(category);
         asset.setFormatCode(formatCode);
         asset.setWidth(width);
         asset.setHeight(height);
