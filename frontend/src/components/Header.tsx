@@ -31,6 +31,9 @@ export function Header() {
           <Link to="/credits" className="body-sm tabular" style={{ textDecoration: 'none' }}>
             크레딧 <strong className="body-strong" style={{ color: 'var(--orange-text)' }}>{account.credit_balance.toLocaleString()}</strong>
           </Link>
+          <Link to="/support" className="body-sm" style={{ color: 'var(--gray-warm)', textDecoration: 'none' }}>
+            문의·피드백
+          </Link>
           <Link to="/account" className="body-sm" style={{ color: 'var(--gray-warm)', textDecoration: 'none' }}>
             계정 설정
           </Link>

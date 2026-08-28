@@ -9,6 +9,9 @@ interface AdminAccount {
 interface AdminJob {
   id: string; kind: string; status: string; error: string | null; attempts: number; created_at: string;
 }
+interface AdminInquiry {
+  id: string; subject: string; message: string; contact: string | null; status: string; created_at: string;
+}
 
 /** 관리자 백오피스(1-20). role=admin만 실제로 데이터를 볼 수 있다(서버가 403/404로 막음). */
 export default function AdminPage() {
@@ -23,6 +26,15 @@ export default function AdminPage() {
   const { data: jobs } = useQuery({
     queryKey: ['admin', 'jobs'],
     queryFn: () => api.get<{ items: AdminJob[] }>('/admin/jobs'),
+  });
+  const { data: inquiries } = useQuery({
+    queryKey: ['admin', 'inquiries'],
+    queryFn: () => api.get<{ items: AdminInquiry[] }>('/admin/inquiries'),
+  });
+
+  const resolveInquiry = useMutation({
+    mutationFn: (id: string) => api.patch(`/admin/inquiries/${id}`, { status: 'closed' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'inquiries'] }),
   });
 
   const grant = useMutation({
@@ -41,6 +53,38 @@ export default function AdminPage() {
       <Header />
       <div className="page">
         <h1 className="h1" style={{ marginBottom: 'var(--sp-6)' }}>관리자 백오피스</h1>
+
+        <section style={{ marginBottom: 'var(--sp-8)' }}>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>고객 문의 수신함 (6-5b)</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="body-sm">
+                <th style={{ textAlign: 'left', padding: 8 }}>제목</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>내용</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>연락처</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>상태</th>
+                <th style={{ padding: 8 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {inquiries?.items.map((i) => (
+                <tr key={i.id} className="body-sm" style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8 }}>{i.subject}</td>
+                  <td style={{ padding: 8, maxWidth: 320 }}>{i.message}</td>
+                  <td style={{ padding: 8 }}>{i.contact}</td>
+                  <td style={{ padding: 8 }}>
+                    <span className={i.status === 'closed' ? 'badge badge-success' : 'badge badge-neutral'}>{i.status}</span>
+                  </td>
+                  <td style={{ padding: 8 }}>
+                    {i.status !== 'closed' && (
+                      <button className="btn btn-tertiary btn-sm" onClick={() => resolveInquiry.mutate(i.id)}>처리완료</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
 
         <section style={{ marginBottom: 'var(--sp-8)' }}>
           <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>계정</h2>
