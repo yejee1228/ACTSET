@@ -3,6 +3,8 @@ package com.actset.web;
 import com.actset.common.ApiException;
 import com.actset.domain.Job;
 import com.actset.repository.JobRepository;
+import com.actset.security.CurrentUser;
+import com.actset.service.ProjectService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
@@ -17,9 +19,28 @@ import java.util.UUID;
 public class JobController {
 
     private final JobRepository jobRepository;
+    private final ProjectService projectService;
 
-    public JobController(JobRepository jobRepository) {
+    public JobController(JobRepository jobRepository, ProjectService projectService) {
         this.jobRepository = jobRepository;
+        this.projectService = projectService;
+    }
+
+    /** 6-5c 진행 중 작업 안내 — 재진입 시 처리 중인 job을 알 수 있게 한다(docs/13). */
+    @GetMapping("/api/v1/projects/{projectId}/jobs")
+    public Map<String, Object> listForProject(@PathVariable UUID projectId) {
+        projectService.getOwned(projectId, CurrentUser.id());
+        List<Job> jobs = jobRepository.findByProjectIdOrderByCreatedAtDesc(projectId).stream()
+                .filter(j -> "pending".equals(j.getStatus()) || "running".equals(j.getStatus()))
+                .toList();
+        List<Map<String, Object>> items = jobs.stream().map(j -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", j.getId().toString());
+            m.put("kind", j.getKind());
+            m.put("status", j.getStatus());
+            return m;
+        }).toList();
+        return Map.of("items", items);
     }
 
     @GetMapping("/api/v1/jobs/{jobId}")

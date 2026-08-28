@@ -8,6 +8,15 @@ interface ProjectDetailWithCounts extends ProjectDetail {
   flags: ProjectDetail['flags'] & { stale_info_count?: number; stale_design_count?: number };
 }
 
+const JOB_KIND_LABELS: Record<string, string> = {
+  draft_generate: '시안 생성',
+  decompose_layers: '레이어 분해',
+  recompose: '규격 일괄변환',
+  resync: '포스터 정보 반영',
+  zip_download: '압축 다운로드 준비',
+  render_print: '인쇄용 렌더링',
+};
+
 /** ⑦ 프로젝트 대시보드(4-1). 대표 포스터 + 규격변환 그리드, 선택/일괄 다운로드(4-2), 개별 삭제(4-6). */
 export default function ProjectDashboardPage() {
   const { id } = useParams<{ id: string }>();
@@ -33,6 +42,14 @@ export default function ProjectDashboardPage() {
     queryFn: () => api.get<{ items: AssetItem[] }>(`/projects/${id}/assets?category=규격변환`),
     enabled: !!id,
   });
+
+  const { data: activeJobsData } = useQuery({
+    queryKey: ['projectJobs', id],
+    queryFn: () => api.get<{ items: { id: string; kind: string; status: string }[] }>(`/projects/${id}/jobs`),
+    enabled: !!id,
+    refetchInterval: 4000,
+  });
+  const activeJobs = activeJobsData?.items ?? [];
 
   const deleteAsset = useMutation({
     mutationFn: (assetId: string) => api.del(`/assets/${assetId}`),
@@ -86,6 +103,14 @@ export default function ProjectDashboardPage() {
             <Link to={`/projects/${id}/edit`} className="btn btn-secondary">정보 수정</Link>
           </div>
         </div>
+
+        {activeJobs.length > 0 && (
+          <div className="card" style={{ padding: 'var(--sp-4)', marginBottom: 'var(--sp-5)', background: 'var(--bg-hover)' }}>
+            <p className="body-sm">
+              진행 중인 작업이 있어요: {activeJobs.map((j) => JOB_KIND_LABELS[j.kind] ?? j.kind).join(', ')}
+            </p>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--sp-8)' }}>
           <div>
