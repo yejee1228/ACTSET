@@ -1,5 +1,7 @@
 server:
   port: ${SERVER_PORT:8080}
+  # P-6: 배포 시 처리 중이던 HTTP 요청이 끝날 때까지 기다린 뒤 종료한다.
+  shutdown: graceful
   servlet:
     session:
       timeout: 7d

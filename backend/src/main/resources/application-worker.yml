@@ -1,6 +1,16 @@
 spring:
   main:
     web-application-type: none
+  # P-6 graceful shutdown: 배포 시 SIGTERM이 와도 진행 중인 폴링(job 1건 처리)이
+  # 끝날 때까지 최대 30초 기다린 뒤 종료한다 — job이 running 상태로 고아가 되지 않는다.
+  # 그래도 강제 종료된 경우의 안전망은 recoverStaleJobs(locked_at 30분 기준)가 맡는다.
+  task:
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 30s
+  lifecycle:
+    timeout-per-shutdown-phase: 35s
 
 actset:
   worker:
