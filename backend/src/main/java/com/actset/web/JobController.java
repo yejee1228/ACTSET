@@ -41,6 +41,7 @@ public class JobController {
                 cm.put("job_id", c.getId().toString());
                 cm.put("status", c.getStatus());
                 cm.put("error", c.getError());
+                cm.put("format_code", c.getPayload() != null ? c.getPayload().path("format_code").asText(null) : null);
                 return cm;
             }).toList());
         }
