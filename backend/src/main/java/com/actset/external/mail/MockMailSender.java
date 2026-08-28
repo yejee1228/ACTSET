@@ -16,6 +16,13 @@ public class MockMailSender implements MailSender {
 
     @Override
     public void send(String to, String subject, String body) {
-        log.info("[MOCK MAIL] to={} subject={}\n{}", to, subject, body);
+        // P-8 개인정보 마스킹: 로그에는 이메일 원문 대신 마스킹된 형태만 남긴다.
+        log.info("[MOCK MAIL] to={} subject={}\n{}", mask(to), subject, body);
+    }
+
+    private String mask(String email) {
+        int at = email.indexOf('@');
+        if (at <= 1) return "***" + email.substring(Math.max(at, 0));
+        return email.charAt(0) + "***" + email.substring(at);
     }
 }

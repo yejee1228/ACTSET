@@ -1,9 +1,11 @@
 package com.actset.worker;
 
+import com.actset.config.RequestIdFilter;
 import com.actset.domain.Job;
 import com.actset.repository.JobRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.MDC;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +35,13 @@ public class JobService {
         Job job = new Job();
         job.setKind(kind);
         job.setProjectId(projectId);
-        job.setPayload(payload != null ? payload : objectMapper.createObjectNode());
+        ObjectNode finalPayload = payload != null ? payload : objectMapper.createObjectNode();
+        // P-8: 요청을 만든 HTTP 호출의 상관관계 ID를 job에 실어 워커 로그까지 이어지게 한다.
+        String requestId = MDC.get(RequestIdFilter.MDC_KEY);
+        if (requestId != null) {
+            finalPayload.put("request_id", requestId);
+        }
+        job.setPayload(finalPayload);
         job.setParentJobId(parentJobId);
         job.setStatus("pending");
         return jobRepository.save(job);

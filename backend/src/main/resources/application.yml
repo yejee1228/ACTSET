@@ -23,6 +23,11 @@ spring:
       max-file-size: 20MB
       max-request-size: 25MB
 
+logging:
+  pattern:
+    # P-8: 요청 추적 ID를 모든 로그 라인에 심는다(비동기 job까지 이어짐 — JobService.enqueue 참고).
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-no-request-id}] --- [%thread] %logger{36} : %msg%n"
+
 management:
   endpoints:
     web:

@@ -83,8 +83,15 @@ public class PosterTextRenderer {
         }
     }
 
-    /** TITLE — 항상 유지, 외곽선+그림자 효과(모드 A 기본, docs/05). */
+    /**
+     * TITLE — 항상 유지, 외곽선+그림자 효과(모드 A 기본, docs/05).
+     * 공연명은 ① 화면에서 필수값이라 정상 흐름에서는 비어 있을 수 없지만, TextLayout이
+     * 빈 문자열에 예외를 던지므로 방어적으로 자리만 비워둔다(오탐 대신 통짜 실패는 피한다).
+     */
     private void drawTitle(Graphics2D g, int w, int h, String titleText, double[] titleArea, ObjectNode objectMap) {
+        if (titleText == null || titleText.isBlank()) {
+            return;
+        }
         int ax0 = (int) (titleArea[0] * w), ay0 = (int) (titleArea[1] * h);
         int ax1 = (int) (titleArea[2] * w), ay1 = (int) (titleArea[3] * h);
         int shortSide = Math.min(w, h);

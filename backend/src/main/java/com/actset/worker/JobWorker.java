@@ -1,10 +1,12 @@
 package com.actset.worker;
 
+import com.actset.config.RequestIdFilter;
 import com.actset.domain.Job;
 import com.actset.service.CreditService;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -48,21 +50,29 @@ public class JobWorker {
     }
 
     private void process(Job job) {
-        JobHandler handler = handlers.get(job.getKind());
-        if (handler == null) {
-            log.warn("등록된 핸들러가 없는 job.kind={} (id={}) — 실패 처리", job.getKind(), job.getId());
-            jobService.markFailed(job.getId(), "핸들러 미등록: " + job.getKind());
-            refund(job);
-            return;
-        }
+        // P-8: 등록 시점의 요청 추적 ID를 이어받아 워커 로그도 같은 ID로 상관관계를 유지한다.
+        String requestId = job.getPayload() != null && job.getPayload().has("request_id")
+                ? job.getPayload().get("request_id").asText() : job.getId().toString();
+        MDC.put(RequestIdFilter.MDC_KEY, requestId);
         try {
-            ObjectNode result = handler.handle(job);
-            jobService.markSucceeded(job.getId(), result);
-            log.info("job {} ({}) 완료", job.getId(), job.getKind());
-        } catch (Exception e) {
-            log.error("job {} ({}) 실패: {}", job.getId(), job.getKind(), e.getMessage(), e);
-            jobService.markFailed(job.getId(), e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
-            refund(job);
+            JobHandler handler = handlers.get(job.getKind());
+            if (handler == null) {
+                log.warn("등록된 핸들러가 없는 job.kind={} (id={}) — 실패 처리", job.getKind(), job.getId());
+                jobService.markFailed(job.getId(), "핸들러 미등록: " + job.getKind());
+                refund(job);
+                return;
+            }
+            try {
+                ObjectNode result = handler.handle(job);
+                jobService.markSucceeded(job.getId(), result);
+                log.info("job {} ({}) 완료", job.getId(), job.getKind());
+            } catch (Exception e) {
+                log.error("job {} ({}) 실패: {}", job.getId(), job.getKind(), e.getMessage(), e);
+                jobService.markFailed(job.getId(), e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+                refund(job);
+            }
+        } finally {
+            MDC.remove(RequestIdFilter.MDC_KEY);
         }
     }
 
