@@ -1,0 +1,35 @@
+import { Route, Routes } from 'react-router-dom';
+import IntroPage from './pages/IntroPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
+import HomePage from './pages/HomePage';
+import Step1InfoPage from './pages/Step1InfoPage';
+import Step2AdditionalInfoPage from './pages/Step2AdditionalInfoPage';
+import Step3DraftSelectionPage from './pages/Step3DraftSelectionPage';
+import Step4ConfirmPage from './pages/Step4ConfirmPage';
+import Step4bNextActionPage from './pages/Step4bNextActionPage';
+import StubPage from './pages/StubPage';
+import { RequireAuth } from './components/RequireAuth';
+
+export default function App() {
+  return (
+    <Routes>
+      <Route path="/" element={<IntroPage />} />
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/signup" element={<SignupPage />} />
+
+      <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
+      <Route path="/account" element={<RequireAuth><StubPage title="계정 설정" /></RequireAuth>} />
+
+      <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
+      <Route path="/projects/:id/additional" element={<RequireAuth><Step2AdditionalInfoPage /></RequireAuth>} />
+      <Route path="/projects/:id/drafts" element={<RequireAuth><Step3DraftSelectionPage /></RequireAuth>} />
+      <Route path="/projects/:id/confirm" element={<RequireAuth><Step4ConfirmPage /></RequireAuth>} />
+      <Route path="/projects/:id/next" element={<RequireAuth><Step4bNextActionPage /></RequireAuth>} />
+      <Route path="/projects/:id/dashboard" element={<RequireAuth><StubPage title="프로젝트 대시보드" /></RequireAuth>} />
+      <Route path="/projects/:id/formats" element={<RequireAuth><StubPage title="규격 선택" /></RequireAuth>} />
+
+      <Route path="*" element={<IntroPage />} />
+    </Routes>
+  );
+}

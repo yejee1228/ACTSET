@@ -17,6 +17,7 @@ HELP.md
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
 
 # 로그·IDE
 *.log
