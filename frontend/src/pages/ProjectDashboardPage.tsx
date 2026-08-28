@@ -81,7 +81,10 @@ export default function ProjectDashboardPage() {
               <span className="badge badge-neutral" style={{ marginTop: 'var(--sp-2)' }}>일정/장소 미정</span>
             )}
           </div>
-          <Link to={`/projects/${id}/edit`} className="btn btn-secondary">정보 수정</Link>
+          <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+            <Link to={`/projects/${id}/print`} className="btn btn-secondary">인쇄</Link>
+            <Link to={`/projects/${id}/edit`} className="btn btn-secondary">정보 수정</Link>
+          </div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 'var(--sp-8)' }}>
