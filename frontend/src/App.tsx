@@ -12,7 +12,7 @@ import Step4ConfirmPage from './pages/Step4ConfirmPage';
 import Step4bNextActionPage from './pages/Step4bNextActionPage';
 import Step5FormatSelectionPage from './pages/Step5FormatSelectionPage';
 import Step6RecomposeResultsPage from './pages/Step6RecomposeResultsPage';
-import StubPage from './pages/StubPage';
+import ProjectDashboardPage from './pages/ProjectDashboardPage';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AdminPage from './pages/AdminPage';
 import NotFoundPage from './pages/NotFoundPage';
@@ -40,7 +40,7 @@ export default function App() {
         <Route path="/projects/:id/drafts" element={<RequireAuth><Step3DraftSelectionPage /></RequireAuth>} />
         <Route path="/projects/:id/confirm" element={<RequireAuth><Step4ConfirmPage /></RequireAuth>} />
         <Route path="/projects/:id/next" element={<RequireAuth><Step4bNextActionPage /></RequireAuth>} />
-        <Route path="/projects/:id/dashboard" element={<RequireAuth><StubPage title="프로젝트 대시보드" /></RequireAuth>} />
+        <Route path="/projects/:id/dashboard" element={<RequireAuth><ProjectDashboardPage /></RequireAuth>} />
         <Route path="/projects/:id/formats" element={<RequireAuth><Step5FormatSelectionPage /></RequireAuth>} />
         <Route path="/projects/:id/recompose-results" element={<RequireAuth><Step6RecomposeResultsPage /></RequireAuth>} />
 

@@ -97,9 +97,17 @@ public class ProjectController {
         body.put("genre", project.getGenre());
         body.put("performance_info", project.getPerformanceInfo());
         body.put("design_assets", project.getDesignAssets());
+        List<GeneratedAsset> assets = generatedAssetRepository.findByProjectIdAndDeletedAtIsNullOrderByCreatedAtDesc(project.getId());
+        long staleInfo = assets.stream().filter(a -> project.getInfoUpdatedAt() != null
+                && (a.getInfoSyncedAt() == null || project.getInfoUpdatedAt().isAfter(a.getInfoSyncedAt()))).count();
+        long staleDesign = assets.stream().filter(a -> project.getDesignUpdatedAt() != null
+                && (a.getDesignSyncedAt() == null || project.getDesignUpdatedAt().isAfter(a.getDesignSyncedAt()))).count();
+
         Map<String, Object> flags = new LinkedHashMap<>();
         flags.put("date_undetermined", project.isDateUndetermined());
         flags.put("venue_undetermined", project.isVenueUndetermined());
+        flags.put("stale_info_count", staleInfo);
+        flags.put("stale_design_count", staleDesign);
         body.put("flags", flags);
         return body;
     }
