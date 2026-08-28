@@ -1,20 +1,28 @@
 package com.actset.web;
 
+import com.actset.domain.GeneratedAsset;
 import com.actset.domain.Project;
+import com.actset.repository.GeneratedAssetRepository;
 import com.actset.security.CurrentUser;
 import com.actset.service.ConfirmService;
+import com.actset.service.GeneratedAssetService;
 import com.actset.service.ProjectInfoService;
 import com.actset.service.ProjectService;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
-/** docs/11 Stage 1 프로젝트. 목록 등은 1-6에서 확장한다. */
+/** docs/11 Stage 1 프로젝트. */
 @RestController
 @RequestMapping("/api/v1/projects")
 public class ProjectController {
@@ -22,12 +30,20 @@ public class ProjectController {
     private final ProjectService projectService;
     private final ProjectInfoService projectInfoService;
     private final ConfirmService confirmService;
+    private final com.actset.repository.ProjectRepository projectRepository;
+    private final GeneratedAssetRepository generatedAssetRepository;
+    private final GeneratedAssetService generatedAssetService;
 
     public ProjectController(ProjectService projectService, ProjectInfoService projectInfoService,
-                              ConfirmService confirmService) {
+                              ConfirmService confirmService, com.actset.repository.ProjectRepository projectRepository,
+                              GeneratedAssetRepository generatedAssetRepository,
+                              GeneratedAssetService generatedAssetService) {
         this.projectService = projectService;
         this.projectInfoService = projectInfoService;
         this.confirmService = confirmService;
+        this.projectRepository = projectRepository;
+        this.generatedAssetRepository = generatedAssetRepository;
+        this.generatedAssetService = generatedAssetService;
     }
 
     @PostMapping
@@ -38,6 +54,37 @@ public class ProjectController {
         body.put("status", project.getStatus());
         body.put("created_at", project.getCreatedAt().toString());
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    /** 0-B 홈 대시보드(1-6) — active 프로젝트만 노출한다. */
+    @GetMapping
+    public Map<String, Object> list(@RequestParam(required = false) String q,
+                                      @RequestParam(defaultValue = "20") int limit) {
+        UUID ownerId = CurrentUser.id();
+        var pageable = PageRequest.of(0, Math.min(limit, 50), Sort.by(Sort.Direction.DESC, "updatedAt"));
+        var page = (q == null || q.isBlank())
+                ? projectRepository.findByOwnerIdAndStatusOrderByUpdatedAtDesc(ownerId, "active", pageable)
+                : projectRepository.findByOwnerIdAndStatusAndMainTitleContainingIgnoreCaseOrderByUpdatedAtDesc(
+                        ownerId, "active", q, pageable);
+
+        List<Map<String, Object>> items = page.getContent().stream().map(p -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", p.getId().toString());
+            m.put("main_title", p.getMainTitle());
+            m.put("genre", p.getGenre());
+            m.put("primary_date", p.getPrimaryDate() != null ? p.getPrimaryDate().toString() : null);
+            m.put("date_undetermined", p.isDateUndetermined());
+            Optional<GeneratedAsset> poster = generatedAssetRepository
+                    .findFirstByProjectIdAndCategoryAndDeletedAtIsNull(p.getId(), "포스터");
+            m.put("thumbnail_url", poster.map(a -> generatedAssetService.toSignedUrl(a.getPreviewImageUrl())).orElse(null));
+            m.put("updated_at", p.getUpdatedAt().toString());
+            return m;
+        }).toList();
+
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("items", items);
+        body.put("next_cursor", null);
+        return body;
     }
 
     @GetMapping("/{id}")
@@ -82,5 +129,16 @@ public class ProjectController {
         body.put("poster_asset_id", result.posterAssetId().toString());
         body.put("confirmed_at", result.confirmedAt().toString());
         return body;
+    }
+
+    /** 0-B 카드 메뉴 → 삭제(4-9). 소프트 삭제, 30일 후 배치가 하드 삭제(4-8, 미착수). */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        Project project = projectService.getOwned(id, CurrentUser.id());
+        project.setStatus("deleted");
+        project.setDeletedAt(Instant.now());
+        project.setUpdatedAt(Instant.now());
+        projectRepository.save(project);
+        return ResponseEntity.noContent().build();
     }
 }
