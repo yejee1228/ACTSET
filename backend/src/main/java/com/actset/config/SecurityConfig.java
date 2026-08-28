@@ -52,7 +52,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/signup", "/api/v1/auth/login",
                         "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm").permitAll()
-                .requestMatchers("/api/v1/formats").permitAll()
+                .requestMatchers("/api/v1/formats", "/api/v1/system/status").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

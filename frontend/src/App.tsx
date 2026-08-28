@@ -13,30 +13,36 @@ import Step4bNextActionPage from './pages/Step4bNextActionPage';
 import StubPage from './pages/StubPage';
 import AccountSettingsPage from './pages/AccountSettingsPage';
 import AdminPage from './pages/AdminPage';
+import NotFoundPage from './pages/NotFoundPage';
 import { RequireAuth } from './components/RequireAuth';
+import { MaintenanceBanner } from './components/MaintenanceBanner';
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<IntroPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+    <ErrorBoundary>
+      <MaintenanceBanner />
+      <Routes>
+        <Route path="/" element={<IntroPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-      <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
-      <Route path="/account" element={<RequireAuth><AccountSettingsPage /></RequireAuth>} />
-      <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
+        <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
+        <Route path="/account" element={<RequireAuth><AccountSettingsPage /></RequireAuth>} />
+        <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
 
-      <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
-      <Route path="/projects/:id/additional" element={<RequireAuth><Step2AdditionalInfoPage /></RequireAuth>} />
-      <Route path="/projects/:id/drafts" element={<RequireAuth><Step3DraftSelectionPage /></RequireAuth>} />
-      <Route path="/projects/:id/confirm" element={<RequireAuth><Step4ConfirmPage /></RequireAuth>} />
-      <Route path="/projects/:id/next" element={<RequireAuth><Step4bNextActionPage /></RequireAuth>} />
-      <Route path="/projects/:id/dashboard" element={<RequireAuth><StubPage title="프로젝트 대시보드" /></RequireAuth>} />
-      <Route path="/projects/:id/formats" element={<RequireAuth><StubPage title="규격 선택" /></RequireAuth>} />
+        <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
+        <Route path="/projects/:id/additional" element={<RequireAuth><Step2AdditionalInfoPage /></RequireAuth>} />
+        <Route path="/projects/:id/drafts" element={<RequireAuth><Step3DraftSelectionPage /></RequireAuth>} />
+        <Route path="/projects/:id/confirm" element={<RequireAuth><Step4ConfirmPage /></RequireAuth>} />
+        <Route path="/projects/:id/next" element={<RequireAuth><Step4bNextActionPage /></RequireAuth>} />
+        <Route path="/projects/:id/dashboard" element={<RequireAuth><StubPage title="프로젝트 대시보드" /></RequireAuth>} />
+        <Route path="/projects/:id/formats" element={<RequireAuth><StubPage title="규격 선택" /></RequireAuth>} />
 
-      <Route path="*" element={<IntroPage />} />
-    </Routes>
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }

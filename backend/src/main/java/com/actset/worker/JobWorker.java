@@ -1,6 +1,7 @@
 package com.actset.worker;
 
 import com.actset.domain.Job;
+import com.actset.service.CreditService;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -27,13 +28,15 @@ public class JobWorker {
     private static final Logger log = LoggerFactory.getLogger(JobWorker.class);
 
     private final JobService jobService;
+    private final CreditService creditService;
     private final Map<String, JobHandler> handlers;
 
     @Value("${actset.worker.stale-running-minutes:30}")
     private int staleRunningMinutes;
 
-    public JobWorker(JobService jobService, List<JobHandler> handlerList) {
+    public JobWorker(JobService jobService, CreditService creditService, List<JobHandler> handlerList) {
         this.jobService = jobService;
+        this.creditService = creditService;
         this.handlers = handlerList.stream().collect(Collectors.toMap(JobHandler::kind, h -> h));
     }
 
@@ -49,6 +52,7 @@ public class JobWorker {
         if (handler == null) {
             log.warn("등록된 핸들러가 없는 job.kind={} (id={}) — 실패 처리", job.getKind(), job.getId());
             jobService.markFailed(job.getId(), "핸들러 미등록: " + job.getKind());
+            refund(job);
             return;
         }
         try {
@@ -58,6 +62,16 @@ public class JobWorker {
         } catch (Exception e) {
             log.error("job {} ({}) 실패: {}", job.getId(), job.getKind(), e.getMessage(), e);
             jobService.markFailed(job.getId(), e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName());
+            refund(job);
+        }
+    }
+
+    /** 실패한 작업에 크레딧 차감 이력이 있으면 환불한다(CLAUDE.md 규칙 4, 1-24). */
+    private void refund(Job job) {
+        try {
+            creditService.refundByJob(job.getId(), job.getKind() + " 실패 환불");
+        } catch (Exception e) {
+            log.error("job {} 환불 처리 실패 — 수동 확인 필요", job.getId(), e);
         }
     }
 

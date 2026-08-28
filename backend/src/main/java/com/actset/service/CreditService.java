@@ -65,11 +65,14 @@ public class CreditService {
         creditTransactionRepository.save(tx);
     }
 
-    /** 작업 실패 시 환불. job_id당 consume 1건 제약과 짝을 맞춰 중복 환불을 피한다. */
+    /** 작업 실패 시 환불. job_id당 consume 1건 제약과 refund 중복 확인으로 이중 환불을 막는다. */
     @Transactional
     public void refund(UUID accountId, int amount, UUID jobId, String description) {
         if (!creditTransactionRepository.existsByJobIdAndType(jobId, "consume")) {
             return; // 애초에 차감된 적 없는 작업은 환불하지 않는다(중복 방지)
+        }
+        if (creditTransactionRepository.existsByJobIdAndType(jobId, "refund")) {
+            return; // 이미 환불된 작업(관리자 재시도 후 재실패 등) — 중복 환불 방지
         }
         Account account = accountRepository.findById(accountId).orElseThrow(ApiException::notFound);
         account.setCreditBalance(account.getCreditBalance() + amount);
@@ -83,5 +86,15 @@ public class CreditService {
         tx.setJobId(jobId);
         tx.setDescription(description);
         creditTransactionRepository.save(tx);
+    }
+
+    /**
+     * job_id로 원래 차감된 계정·금액을 찾아 자동 환불한다(1-24 — 생성 실패 시 크레딧 환불).
+     * 차감 이력이 없는 작업(무과금 작업)은 조용히 넘어간다.
+     */
+    @Transactional
+    public void refundByJob(UUID jobId, String description) {
+        creditTransactionRepository.findByJobIdAndType(jobId, "consume")
+                .ifPresent(consumeTx -> refund(consumeTx.getAccountId(), -consumeTx.getAmount(), jobId, description));
     }
 }

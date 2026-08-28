@@ -94,7 +94,12 @@ export default function Step3DraftSelectionPage() {
           <p className="body-sm" style={{ marginTop: 'var(--sp-3)' }}>시안을 만들고 있어요 · 보통 20~40초</p>
         )}
         {jobStatus === 'failed' && (
-          <p className="body-sm" style={{ color: 'var(--error)' }}>시안 생성에 실패했습니다. 다시 시도해주세요.</p>
+          <div className="card" style={{ padding: 'var(--sp-5)', borderColor: 'var(--error)' }}>
+            <p className="body-sm" style={{ color: 'var(--error)', marginBottom: 'var(--sp-3)' }}>
+              시안 생성에 실패했습니다. 사용된 크레딧은 자동으로 환불되었습니다.
+            </p>
+            <button className="btn btn-secondary" onClick={() => generate('initial')}>다시 시도</button>
+          </div>
         )}
 
         {candidates.length > 0 && (
