@@ -21,6 +21,11 @@ public class RateLimiter {
 
     /** key(계정id·IP 등)가 windowSeconds 안에 limit회를 초과했으면 false. */
     public boolean tryAcquire(String key, int limit, int windowSeconds) {
+        return tryAcquireN(key, 1, limit, windowSeconds);
+    }
+
+    /** count건을 한 번에 원자적으로 소비한다(1-25 — 일괄생성 count장을 예산에서 한 번에 차감). */
+    public boolean tryAcquireN(String key, int count, int limit, int windowSeconds) {
         Instant now = Instant.now();
         Instant windowStart = now.minus(Duration.ofSeconds(windowSeconds));
         Deque<Instant> deque = hits.computeIfAbsent(key, k -> new ConcurrentLinkedDeque<>());
@@ -29,10 +34,12 @@ public class RateLimiter {
             while (!deque.isEmpty() && deque.peekFirst().isBefore(windowStart)) {
                 deque.pollFirst();
             }
-            if (deque.size() >= limit) {
+            if (deque.size() + count > limit) {
                 return false;
             }
-            deque.addLast(now);
+            for (int i = 0; i < count; i++) {
+                deque.addLast(now);
+            }
             return true;
         }
     }

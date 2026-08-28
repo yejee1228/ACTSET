@@ -28,17 +28,20 @@ public class DraftService {
     private final CreditService creditService;
     private final ObjectMapper objectMapper;
     private final ContentModerationAdapter contentModerationAdapter;
+    private final CostCapService costCapService;
 
     @Value("${actset.credit.cost-per-draft-image:10}")
     private int costPerImage;
 
     public DraftService(ProjectService projectService, JobService jobService, CreditService creditService,
-                         ObjectMapper objectMapper, ContentModerationAdapter contentModerationAdapter) {
+                         ObjectMapper objectMapper, ContentModerationAdapter contentModerationAdapter,
+                         CostCapService costCapService) {
         this.projectService = projectService;
         this.jobService = jobService;
         this.creditService = creditService;
         this.objectMapper = objectMapper;
         this.contentModerationAdapter = contentModerationAdapter;
+        this.costCapService = costCapService;
     }
 
     @Transactional
@@ -51,6 +54,9 @@ public class DraftService {
         if (!moderation.allowed()) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "CONTENT_BLOCKED", moderation.reason());
         }
+
+        // 1-25: 비용 상한도 크레딧 차감 전에 확인한다 — 차단된 요청에는 비용을 물리지 않는다.
+        costCapService.checkBeforeGeneration(ownerId, count);
 
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("mode", mode);
