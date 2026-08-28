@@ -9,6 +9,11 @@ interface AdminAccount {
 interface AdminJob {
   id: string; kind: string; status: string; error: string | null; attempts: number; created_at: string;
 }
+interface AdminMetrics {
+  funnel: { draft_projects: number; active_projects: number; completion_rate: number };
+  draft_selection: { select_count: number; regenerate_count: number; more_like_count: number; selection_rate: number };
+}
+interface UsageRow { action: string; tx_count: number; total_amount: number }
 interface AdminInquiry {
   id: string; subject: string; message: string; contact: string | null; status: string; created_at: string;
 }
@@ -26,6 +31,14 @@ export default function AdminPage() {
   const { data: jobs } = useQuery({
     queryKey: ['admin', 'jobs'],
     queryFn: () => api.get<{ items: AdminJob[] }>('/admin/jobs'),
+  });
+  const { data: metrics } = useQuery({
+    queryKey: ['admin', 'metrics'],
+    queryFn: () => api.get<AdminMetrics>('/admin/metrics'),
+  });
+  const { data: usage } = useQuery({
+    queryKey: ['admin', 'usage'],
+    queryFn: () => api.get<{ by_action: UsageRow[] }>('/admin/usage'),
   });
   const { data: inquiries } = useQuery({
     queryKey: ['admin', 'inquiries'],
@@ -53,6 +66,44 @@ export default function AdminPage() {
       <Header />
       <div className="page">
         <h1 className="h1" style={{ marginBottom: 'var(--sp-6)' }}>관리자 백오피스</h1>
+
+        <section style={{ marginBottom: 'var(--sp-8)' }}>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>사용 지표 (6-6)</h2>
+          <div style={{ display: 'flex', gap: 'var(--sp-4)', flexWrap: 'wrap' }}>
+            <div className="card" style={{ padding: 'var(--sp-4)', minWidth: 180 }}>
+              <p className="caption">완주율 (활성/전체 프로젝트)</p>
+              <p className="h2 tabular">{metrics ? `${(metrics.funnel.completion_rate * 100).toFixed(1)}%` : '-'}</p>
+              <p className="caption">{metrics?.funnel.active_projects ?? '-'} / {metrics ? metrics.funnel.draft_projects + metrics.funnel.active_projects : '-'}</p>
+            </div>
+            <div className="card" style={{ padding: 'var(--sp-4)', minWidth: 180 }}>
+              <p className="caption">시안 선택률</p>
+              <p className="h2 tabular">{metrics ? `${(metrics.draft_selection.selection_rate * 100).toFixed(1)}%` : '-'}</p>
+              <p className="caption">선택 {metrics?.draft_selection.select_count ?? 0} · 재생성 {metrics?.draft_selection.regenerate_count ?? 0} · 더보기 {metrics?.draft_selection.more_like_count ?? 0}</p>
+            </div>
+          </div>
+        </section>
+
+        <section style={{ marginBottom: 'var(--sp-8)' }}>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>크레딧 소비 분포 (6-8)</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="body-sm">
+                <th style={{ textAlign: 'left', padding: 8 }}>액션</th>
+                <th style={{ textAlign: 'right', padding: 8 }}>건수</th>
+                <th style={{ textAlign: 'right', padding: 8 }}>총 크레딧</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usage?.by_action.map((row) => (
+                <tr key={row.action} className="body-sm" style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8 }}>{row.action}</td>
+                  <td style={{ padding: 8, textAlign: 'right' }} className="tabular">{row.tx_count}</td>
+                  <td style={{ padding: 8, textAlign: 'right' }} className="tabular">{row.total_amount.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
 
         <section style={{ marginBottom: 'var(--sp-8)' }}>
           <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>고객 문의 수신함 (6-5b)</h2>

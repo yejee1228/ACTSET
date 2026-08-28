@@ -5,7 +5,6 @@ import com.actset.domain.Account;
 import com.actset.domain.Job;
 import com.actset.domain.Project;
 import com.actset.repository.AccountRepository;
-import com.actset.repository.CreditTransactionRepository;
 import com.actset.repository.ProjectRepository;
 import com.actset.security.CurrentUser;
 import com.actset.service.AdminService;
@@ -15,7 +14,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /**
  * 관리자 백오피스(1-20). SecurityConfig에서 /api/v1/admin/**는 이미 ROLE_ADMIN만
@@ -27,14 +25,12 @@ public class AdminController {
 
     private final AccountRepository accountRepository;
     private final ProjectRepository projectRepository;
-    private final CreditTransactionRepository creditTransactionRepository;
     private final AdminService adminService;
 
     public AdminController(AccountRepository accountRepository, ProjectRepository projectRepository,
-                            CreditTransactionRepository creditTransactionRepository, AdminService adminService) {
+                            AdminService adminService) {
         this.accountRepository = accountRepository;
         this.projectRepository = projectRepository;
-        this.creditTransactionRepository = creditTransactionRepository;
         this.adminService = adminService;
     }
 
@@ -99,12 +95,4 @@ public class AdminController {
         return m;
     }
 
-    /** 크레딧 소비 분포 — 정식 집계는 6-8에서 확장한다. */
-    @GetMapping("/usage")
-    public Map<String, Object> usage() {
-        var grouped = creditTransactionRepository.findAll().stream()
-                .collect(Collectors.groupingBy(com.actset.domain.CreditTransaction::getType,
-                        Collectors.summingInt(t -> Math.abs(t.getAmount()))));
-        return Map.of("by_type", grouped);
-    }
 }
