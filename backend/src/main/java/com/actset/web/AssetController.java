@@ -1,5 +1,6 @@
 package com.actset.web;
 
+import com.actset.common.ApiException;
 import com.actset.domain.GeneratedAsset;
 import com.actset.domain.Project;
 import com.actset.repository.GeneratedAssetRepository;
@@ -7,9 +8,11 @@ import com.actset.security.CurrentUser;
 import com.actset.service.AssetSelectionService;
 import com.actset.service.GeneratedAssetService;
 import com.actset.service.ProjectService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,6 +38,20 @@ public class AssetController {
     @PostMapping("/api/v1/assets/{id}/select")
     public ResponseEntity<Void> select(@PathVariable UUID id) {
         assetSelectionService.select(id, CurrentUser.id());
+        return ResponseEntity.noContent().build();
+    }
+
+    /** 4-6 개별 삭제 — 소프트 삭제, 30일 뒤 하드 삭제(4-8, 미착수). 포스터는 삭제 불가(docs/11). */
+    @DeleteMapping("/api/v1/assets/{id}")
+    public ResponseEntity<Void> delete(@PathVariable UUID id) {
+        GeneratedAsset asset = generatedAssetRepository.findById(id).orElseThrow(ApiException::notFound);
+        projectService.getOwned(asset.getProjectId(), CurrentUser.id()); // 소유자 확인
+        if ("포스터".equals(asset.getCategory())) {
+            throw new ApiException(HttpStatus.CONFLICT, "POSTER_NOT_DELETABLE", "포스터는 삭제할 수 없습니다.");
+        }
+        asset.setStatus("삭제됨");
+        asset.setDeletedAt(Instant.now());
+        generatedAssetRepository.save(asset);
         return ResponseEntity.noContent().build();
     }
 
