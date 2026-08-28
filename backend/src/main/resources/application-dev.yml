@@ -1,0 +1,9 @@
+# P-2 환경 분리 — 로컬 개발. web/worker(프로세스 역할)와 별개 축이며 함께 켠다.
+# 예) java -jar actset.jar --spring.profiles.active=web,dev
+logging:
+  level:
+    com.actset: DEBUG
+
+actset:
+  external:
+    mock-mode: true

@@ -1,0 +1,8 @@
+# P-2 환경 분리 — 스테이징. 실제 값(DB_HOST 등)은 전부 환경변수로 주입한다(시크릿 미포함).
+logging:
+  level:
+    com.actset: INFO
+
+actset:
+  external:
+    mock-mode: ${EXTERNAL_MOCK_MODE:true}
