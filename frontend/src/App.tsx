@@ -2,6 +2,8 @@ import { Route, Routes } from 'react-router-dom';
 import IntroPage from './pages/IntroPage';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import HomePage from './pages/HomePage';
 import Step1InfoPage from './pages/Step1InfoPage';
 import Step2AdditionalInfoPage from './pages/Step2AdditionalInfoPage';
@@ -18,6 +20,8 @@ export default function App() {
       <Route path="/" element={<IntroPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<SignupPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
 
       <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
       <Route path="/account" element={<RequireAuth><AccountSettingsPage /></RequireAuth>} />
