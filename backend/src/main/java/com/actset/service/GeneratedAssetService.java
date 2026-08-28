@@ -78,6 +78,28 @@ public class GeneratedAssetService {
         return generatedAssetRepository.save(asset);
     }
 
+    /**
+     * 같은 GeneratedAsset 레코드의 render·preview 파일만 교체한다(4-4 포스터 자동반영,
+     * 4-5 최신 반영 공통 — docs/02 "새 레코드가 생기지 않고 교체됨"). 경로가 asset id
+     * 기준으로 고정돼 있어 다시 저장하면 곧 이전 파일 교체다.
+     */
+    @Transactional
+    public void updateRenderInPlace(GeneratedAsset asset, BufferedImage rendered, JsonNode objectMap) {
+        String renderPath = "projects/" + asset.getProjectId() + "/render/" + asset.getId() + ".jpg";
+        String previewPath = "projects/" + asset.getProjectId() + "/preview/" + asset.getId() + ".jpg";
+
+        byte[] renderedBytes = toJpegBytes(rendered);
+        storageService.store(renderedBytes, renderPath, "image/jpeg");
+        storageService.store(toJpegBytes(downscale(rendered, PREVIEW_LONG_EDGE)), previewPath, "image/jpeg");
+
+        asset.setImageUrl(renderPath);
+        asset.setPreviewImageUrl(previewPath);
+        asset.setObjectMap(objectMap);
+        asset.setFileSize((long) renderedBytes.length);
+        asset.setInfoSyncedAt(java.time.Instant.now());
+        generatedAssetRepository.save(asset);
+    }
+
     /** preview_image_url 등 저장 경로(raw)를 서명 URL로 바꿔 API 응답에 담을 때 쓴다. */
     public String toSignedUrl(String storedPath) {
         if (storedPath == null) return null;

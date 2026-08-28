@@ -58,7 +58,8 @@ export default function Step2AdditionalInfoPage() {
     setMandatoryNotices((info.mandatory_notices ?? []).join(', '));
     setImageDirectionNote(info.image_direction_note ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id]);
+    // project 참조 전체에 의존한다(InfoEditPage에서 발견한 stale 캐시 버그와 동일 원인).
+  }, [project]);
 
   const save = useMutation({ mutationFn: (partial: Record<string, unknown>) => api.patch(`/projects/${id}/info`, partial) });
   const debouncedSave = useDebouncedCallback((partial: Record<string, unknown>) => save.mutate(partial), 600);

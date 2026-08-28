@@ -34,7 +34,9 @@ export default function Step1InfoPage() {
     setDate(info?.sessions?.[0]?.date ?? '');
     setDateUndetermined(project.flags?.date_undetermined ?? false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.id]);
+    // project 참조 전체에 의존한다 — id만 보면 stale 캐시 이후 리페치로 최신값이 와도
+    // effect가 재실행되지 않는 버그가 있었다(InfoEditPage에서 발견, docs 참고).
+  }, [project]);
 
   const save = useMutation({
     mutationFn: (partial: Record<string, unknown>) => api.patch(`/projects/${id}/info`, partial),
