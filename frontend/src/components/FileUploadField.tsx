@@ -32,9 +32,11 @@ export function FileUploadField({ projectId, kind, onUploaded, label }: Props) {
       const form = new FormData();
       form.append('file', file);
       form.append('kind', kind);
+      const csrfToken = document.cookie.match(/(?:^|; )XSRF-TOKEN=([^;]*)/)?.[1];
       const res = await fetch(`/api/v1/projects/${projectId}/files`, {
         method: 'POST',
         credentials: 'include',
+        headers: csrfToken ? { 'X-XSRF-TOKEN': decodeURIComponent(csrfToken) } : undefined,
         body: form,
       });
       if (!res.ok) {

@@ -15,10 +15,23 @@ export class ApiError extends Error {
 
 const BASE = '/api/v1';
 
+/** 1-22: 세션 쿠키 인증에 CSRF 토큰을 함께 보낸다(Spring Security 쿠키-헤더 SPA 패턴). */
+function readCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = init?.body ? { 'Content-Type': 'application/json' } : {};
+  const method = (init?.method ?? 'GET').toUpperCase();
+  if (method !== 'GET' && method !== 'HEAD') {
+    const token = readCookie('XSRF-TOKEN');
+    if (token) headers['X-XSRF-TOKEN'] = token;
+  }
+
   const res = await fetch(BASE + path, {
     credentials: 'include',
-    headers: init?.body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     ...init,
   });
 

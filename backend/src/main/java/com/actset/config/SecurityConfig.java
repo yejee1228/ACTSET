@@ -12,8 +12,11 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -26,13 +29,24 @@ public class SecurityConfig {
 
     /**
      * MVP는 세션 쿠키 인증 + 같은 오리진 내장 배포가 기준이다(docs/09).
-     * CSRF 토큰 발급·검증은 1-22에서 레이트리밋과 함께 구현한다 — 그 전까지는 세션 쿠키를
-     * SameSite=Lax로 두어 단순 크로스사이트 요청 위조를 완화한다(아래 쿠키 설정 참고).
+     * CSRF는 쿠키(XSRF-TOKEN, JS가 읽을 수 있게 httpOnly=false)로 토큰을 내려주고
+     * 프런트가 X-XSRF-TOKEN 헤더로 되돌려 보내는 SPA 표준 패턴을 쓴다(1-22).
+     * 가입·로그인은 아직 세션이 없는 시점이라 CSRF로 보호할 대상(기존 세션 탈취)이
+     * 없으므로 제외한다 — 보호 대상은 로그인 이후의 상태변경 API 전체다.
      */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http, RateLimitFilter rateLimitFilter) throws Exception {
+        CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+        CsrfTokenRequestAttributeHandler csrfRequestHandler = new CsrfTokenRequestAttributeHandler();
+
         http
-            .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(csrfTokenRepository)
+                .csrfTokenRequestHandler(csrfRequestHandler)
+                .ignoringRequestMatchers("/api/v1/auth/signup", "/api/v1/auth/login")
+            )
+            .addFilterAfter(new CsrfCookieFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
+            .addFilterAfter(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
             .authorizeHttpRequests(auth -> auth
