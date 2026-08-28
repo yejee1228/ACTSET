@@ -35,6 +35,8 @@ public class FileUploadService {
     private static final Set<String> ALLOWED_KINDS = Set.of(
             "performance_photo", "cast_photo", "logo", "reference_image");
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png");
+    private static final Set<String> ALLOWED_EXTENSIONS = Set.of("jpg", "jpeg", "png");
+    private static final long MAX_BYTES = 15L * 1024 * 1024;
 
     private final UploadedFileRepository uploadedFileRepository;
     private final StorageService storageService;
@@ -55,10 +57,19 @@ public class FileUploadService {
         if (!ALLOWED_KINDS.contains(kind)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "INVALID_KIND", "kind 값이 올바르지 않습니다.");
         }
+        if (file.getSize() > MAX_BYTES) {
+            throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE",
+                    "파일 크기는 15MB를 넘을 수 없습니다.");
+        }
         String contentType = file.getContentType();
         if (contentType == null || !ALLOWED_CONTENT_TYPES.contains(contentType)) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "UNSUPPORTED_TYPE",
                     "jpg·png 파일만 업로드할 수 있습니다.");
+        }
+        String extension = extensionOf(file.getOriginalFilename());
+        if (extension == null || !ALLOWED_EXTENSIONS.contains(extension)) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "UNSUPPORTED_TYPE",
+                    "허용되지 않는 확장자입니다.");
         }
 
         BufferedImage image;
@@ -90,6 +101,11 @@ public class FileUploadService {
 
         String url = storageService.signedUrl(path, Duration.ofHours(1));
         return new UploadResult(fileId, kind, url, image.getWidth(), image.getHeight(), reencoded.length);
+    }
+
+    private String extensionOf(String filename) {
+        if (filename == null || !filename.contains(".")) return null;
+        return filename.substring(filename.lastIndexOf('.') + 1).toLowerCase();
     }
 
     /** ImageIO로 다시 그려 저장 — EXIF(GPS 포함) 등 원본 메타데이터가 결과 바이트에 남지 않는다. */
