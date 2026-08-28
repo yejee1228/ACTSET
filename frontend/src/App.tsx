@@ -9,6 +9,7 @@ import Step3DraftSelectionPage from './pages/Step3DraftSelectionPage';
 import Step4ConfirmPage from './pages/Step4ConfirmPage';
 import Step4bNextActionPage from './pages/Step4bNextActionPage';
 import StubPage from './pages/StubPage';
+import AccountSettingsPage from './pages/AccountSettingsPage';
 import { RequireAuth } from './components/RequireAuth';
 
 export default function App() {
@@ -19,7 +20,7 @@ export default function App() {
       <Route path="/signup" element={<SignupPage />} />
 
       <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
-      <Route path="/account" element={<RequireAuth><StubPage title="계정 설정" /></RequireAuth>} />
+      <Route path="/account" element={<RequireAuth><AccountSettingsPage /></RequireAuth>} />
 
       <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
       <Route path="/projects/:id/additional" element={<RequireAuth><Step2AdditionalInfoPage /></RequireAuth>} />
