@@ -4,31 +4,38 @@ import com.actset.domain.GeneratedAsset;
 import com.actset.domain.Project;
 import com.actset.repository.GeneratedAssetRepository;
 import com.actset.security.CurrentUser;
+import com.actset.service.AssetSelectionService;
 import com.actset.service.GeneratedAssetService;
 import com.actset.service.ProjectService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** docs/11 "4. 결과물" — GET /projects/{id}/assets. */
+/** docs/11 "4. 결과물" — GET /projects/{id}/assets, POST /assets/{id}/select. */
 @RestController
 public class AssetController {
 
     private final ProjectService projectService;
     private final GeneratedAssetRepository generatedAssetRepository;
     private final GeneratedAssetService generatedAssetService;
+    private final AssetSelectionService assetSelectionService;
 
     public AssetController(ProjectService projectService, GeneratedAssetRepository generatedAssetRepository,
-                            GeneratedAssetService generatedAssetService) {
+                            GeneratedAssetService generatedAssetService, AssetSelectionService assetSelectionService) {
         this.projectService = projectService;
         this.generatedAssetRepository = generatedAssetRepository;
         this.generatedAssetService = generatedAssetService;
+        this.assetSelectionService = assetSelectionService;
+    }
+
+    @PostMapping("/api/v1/assets/{id}/select")
+    public ResponseEntity<Void> select(@PathVariable UUID id) {
+        assetSelectionService.select(id, CurrentUser.id());
+        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/api/v1/projects/{id}/assets")
