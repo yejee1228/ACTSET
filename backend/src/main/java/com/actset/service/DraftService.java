@@ -1,8 +1,12 @@
 package com.actset.service;
 
+import com.actset.common.ApiException;
 import com.actset.domain.Job;
 import com.actset.domain.Project;
+import com.actset.external.moderation.ContentModerationAdapter;
+import com.actset.external.moderation.ModerationResult;
 import com.actset.worker.JobService;
+import org.springframework.http.HttpStatus;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,21 +27,30 @@ public class DraftService {
     private final JobService jobService;
     private final CreditService creditService;
     private final ObjectMapper objectMapper;
+    private final ContentModerationAdapter contentModerationAdapter;
 
     @Value("${actset.credit.cost-per-draft-image:10}")
     private int costPerImage;
 
     public DraftService(ProjectService projectService, JobService jobService, CreditService creditService,
-                         ObjectMapper objectMapper) {
+                         ObjectMapper objectMapper, ContentModerationAdapter contentModerationAdapter) {
         this.projectService = projectService;
         this.jobService = jobService;
         this.creditService = creditService;
         this.objectMapper = objectMapper;
+        this.contentModerationAdapter = contentModerationAdapter;
     }
 
     @Transactional
     public UUID requestDrafts(UUID projectId, UUID ownerId, String mode, int count) {
         Project project = projectService.getOwned(projectId, ownerId);
+
+        // 1-23: 차단 시 크레딧을 차감하지 않는다 — consume()보다 먼저 검사한다.
+        String note = project.getPerformanceInfo().path("image_direction_note").asText(null);
+        ModerationResult moderation = contentModerationAdapter.checkText(note);
+        if (!moderation.allowed()) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "CONTENT_BLOCKED", moderation.reason());
+        }
 
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("mode", mode);

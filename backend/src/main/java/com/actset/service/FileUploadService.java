@@ -3,6 +3,8 @@ package com.actset.service;
 import com.actset.common.ApiException;
 import com.actset.domain.Project;
 import com.actset.domain.UploadedFile;
+import com.actset.external.moderation.ContentModerationAdapter;
+import com.actset.external.moderation.ModerationResult;
 import com.actset.repository.ProjectRepository;
 import com.actset.repository.UploadedFileRepository;
 import com.actset.storage.StorageService;
@@ -41,12 +43,14 @@ public class FileUploadService {
     private final UploadedFileRepository uploadedFileRepository;
     private final StorageService storageService;
     private final ProjectRepository projectRepository;
+    private final ContentModerationAdapter contentModerationAdapter;
 
     public FileUploadService(UploadedFileRepository uploadedFileRepository, StorageService storageService,
-                              ProjectRepository projectRepository) {
+                              ProjectRepository projectRepository, ContentModerationAdapter contentModerationAdapter) {
         this.uploadedFileRepository = uploadedFileRepository;
         this.storageService = storageService;
         this.projectRepository = projectRepository;
+        this.contentModerationAdapter = contentModerationAdapter;
     }
 
     public record UploadResult(UUID id, String kind, String url, int width, int height, long bytes) {
@@ -72,15 +76,22 @@ public class FileUploadService {
                     "허용되지 않는 확장자입니다.");
         }
 
+        byte[] rawBytes;
         BufferedImage image;
         try {
-            image = ImageIO.read(new ByteArrayInputStream(file.getBytes()));
+            rawBytes = file.getBytes();
+            image = ImageIO.read(new ByteArrayInputStream(rawBytes));
         } catch (IOException e) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "UNREADABLE_IMAGE", "이미지를 읽을 수 없습니다.");
         }
         if (image == null) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "UNREADABLE_IMAGE",
                     "이미지 형식이 아니거나 손상되었습니다(위장 확장자 포함).");
+        }
+
+        ModerationResult moderation = contentModerationAdapter.checkImage(rawBytes);
+        if (!moderation.allowed()) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "CONTENT_BLOCKED", moderation.reason());
         }
 
         String ext = contentType.equals("image/png") ? "png" : "jpg";
