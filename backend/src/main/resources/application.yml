@@ -23,6 +23,15 @@ spring:
       max-file-size: 20MB
       max-request-size: 25MB
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
 actset:
   storage:
     root: ${STORAGE_ROOT:../storage}

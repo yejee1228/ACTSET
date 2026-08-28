@@ -47,6 +47,7 @@ public class SecurityConfig {
             )
             .addFilterAfter(new CsrfCookieFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
             .addFilterAfter(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(new RequestIdFilter(), org.springframework.security.web.csrf.CsrfFilter.class)
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .securityContext(sc -> sc.securityContextRepository(securityContextRepository()))
             .authorizeHttpRequests(auth -> auth
