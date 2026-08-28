@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, ProjectDetail } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 
 const GENRES = ['클래식', '무용', '연극', '뮤지컬', '어린이공연', '인디밴드', '대중음악'];
 
@@ -10,6 +11,7 @@ const GENRES = ['클래식', '무용', '연극', '뮤지컬', '어린이공연',
 export default function Step1InfoPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  useEffect(() => { trackFunnelStep('step_1_info'); }, []);
 
   const { data: project } = useQuery({
     queryKey: ['project', id],

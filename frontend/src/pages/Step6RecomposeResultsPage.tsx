@@ -3,6 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, AssetItem } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 
 interface ChildJob { job_id: string; status: string; error: string | null; format_code: string | null }
 interface JobStatusDetail { status: string; progress?: { done: number; total: number }; children?: ChildJob[] }
@@ -15,6 +16,8 @@ export default function Step6RecomposeResultsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeFormat, setActiveFormat] = useState<string | null>(null);
+
+  useEffect(() => { trackFunnelStep('step_6_recompose_results'); }, []);
 
   const { data: job } = useQuery({
     queryKey: ['job', jobId],

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, AssetItem, ProjectDetail } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 import { useDebouncedCallback } from '../lib/useDebouncedCallback';
 
 interface Warning { code: string; message: string }
@@ -18,6 +19,8 @@ const PRESETS = [
 export default function PrintPage() {
   const { id } = useParams<{ id: string }>();
   const [acknowledged, setAcknowledged] = useState(false);
+
+  useEffect(() => { trackFunnelStep('print'); }, []);
 
   const { data: project } = useQuery({
     queryKey: ['project', id],

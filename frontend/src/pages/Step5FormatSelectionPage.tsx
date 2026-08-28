@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, ApiError, FormatPresetDto } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 
 const GROUP_LABELS: Record<string, string> = {
   예매처: '예매처', 온라인: '온라인', 오프라인: '오프라인',
@@ -13,6 +14,8 @@ export default function Step5FormatSelectionPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => { trackFunnelStep('step_5_formats'); }, []);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
 

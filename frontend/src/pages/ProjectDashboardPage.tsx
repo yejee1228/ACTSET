@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, AssetItem, ProjectDetail } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 
 interface ProjectDetailWithCounts extends ProjectDetail {
   flags: ProjectDetail['flags'] & { stale_info_count?: number; stale_design_count?: number };
@@ -24,6 +25,8 @@ export default function ProjectDashboardPage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => { trackFunnelStep('dashboard'); }, []);
 
   const { data: project } = useQuery({
     queryKey: ['project', id],
@@ -74,6 +77,7 @@ export default function ProjectDashboardPage() {
         await new Promise((r) => setTimeout(r, 2000));
         const job = await api.get<{ status: string; result: { zip_url?: string } | null }>(`/jobs/${job_id}`);
         if (job.status === 'succeeded' && job.result?.zip_url) {
+          trackFunnelStep('download');
           window.open(job.result.zip_url, '_blank');
           return;
         }

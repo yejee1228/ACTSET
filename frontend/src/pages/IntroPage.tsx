@@ -1,9 +1,12 @@
+import { useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../lib/useAuth';
+import { trackFunnelStep } from '../lib/funnel';
 
 /** 0-A 소개 페이지(docs/03·04). 로그인 사용자는 0-B로 자동 이동. */
 export default function IntroPage() {
   const { account, isLoading } = useAuth();
+  useEffect(() => { trackFunnelStep('visit'); }, []);
   if (!isLoading && account) return <Navigate to="/home" replace />;
 
   return (

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, ApiError, AssetItem, JobStatus } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 
 /** ③ 시안 선택 화면(1-12·1-13). 시안 3장이 화면의 대부분을 차지한다(docs/16). */
 export default function Step3DraftSelectionPage() {
@@ -65,6 +66,8 @@ export default function Step3DraftSelectionPage() {
       setErrorMessage(err instanceof ApiError ? err.message : '요청에 실패했습니다.');
     }
   }
+
+  useEffect(() => { trackFunnelStep('step_3_drafts'); }, []);
 
   useEffect(() => {
     if (startedRef.current) return;

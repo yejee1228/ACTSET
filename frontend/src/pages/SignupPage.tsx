@@ -2,6 +2,7 @@ import { FormEvent, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, Account } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 
 const TERMS_VERSION = '2026-08-28';
 
@@ -32,6 +33,7 @@ export default function SignupPage() {
         terms_version: TERMS_VERSION,
       });
       queryClient.setQueryData(['auth', 'me'], account);
+      trackFunnelStep('signup');
       navigate('/home');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '가입에 실패했습니다.');

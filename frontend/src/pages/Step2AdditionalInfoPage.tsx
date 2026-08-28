@@ -4,6 +4,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { FileUploadField } from '../components/FileUploadField';
 import { api, ProjectDetail } from '../lib/api';
+import { trackFunnelStep } from '../lib/funnel';
 import { useDebouncedCallback } from '../lib/useDebouncedCallback';
 
 interface CastRow {
@@ -21,6 +22,7 @@ const GROUPS = [
 export default function Step2AdditionalInfoPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  useEffect(() => { trackFunnelStep('step_2_additional'); }, []);
   const [openGroup, setOpenGroup] = useState<string>(GROUPS[0]);
 
   const { data: project } = useQuery({
