@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACTSET 디자인 시스템 미리보기</title>
+<style>
+  :root {
+    --orange:#FF6A2A; --orange-deep:#E95516; --orange-soft:#FFF0E8;
+    --charcoal:#1F1F1F; --gray-warm:#6B6865; --border:#E7E3DF;
+    --bg:#FAF8F5; --surface:#FFFFFF;
+    --orange-pressed:#CC4A12; --orange-text:#BC3E0C;
+    --gray-disabled:#A8A49F; --bg-hover:#F3F0EC;
+    --success:#1B7F4B; --success-bg:#E8F5EE;
+    --warning:#7A5B00; --warning-bg:#FFF6DE;
+    --error:#C93030; --error-bg:#FCEBEB;
+    --r-sm:6px; --r-md:8px; --r-lg:12px; --r-xl:16px;
+    --shadow-sm:0 1px 2px rgba(31,31,31,.05);
+    --shadow-md:0 4px 12px rgba(31,31,31,.08);
+    --shadow-lg:0 12px 32px rgba(31,31,31,.14);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    background:var(--bg); color:var(--charcoal); font-size:15px; line-height:1.53;
+  }
+  .wrap { max-width:1100px; margin:0 auto; padding:48px 24px 96px; }
+  .topbar { display:flex; align-items:baseline; gap:12px; margin-bottom:8px; }
+  .wordmark { font-size:22px; font-weight:700; letter-spacing:.02em; }
+  .topbar span { color:var(--gray-warm); font-size:13px; }
+  h1 { font-size:24px; line-height:32px; font-weight:600; margin:0 0 40px; }
+  h2 { font-size:20px; line-height:28px; font-weight:600; margin:56px 0 16px; padding-top:24px; border-top:1px solid var(--border); }
+  h3 { font-size:16px; line-height:24px; font-weight:600; }
+  .note { color:var(--gray-warm); font-size:13px; margin:-8px 0 20px; }
+
+  /* palette */
+  .swatches { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+  .swatch { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-sm); }
+  .swatch .chip { height:72px; }
+  .swatch .meta { padding:10px 12px; }
+  .swatch .meta b { display:block; font-size:13px; font-weight:600; }
+  .swatch .meta code { font-size:12px; color:var(--gray-warm); font-family:ui-monospace,Consolas,monospace; }
+
+  /* type */
+  .typerow { display:flex; align-items:baseline; gap:20px; padding:10px 0; border-bottom:1px dashed var(--border); }
+  .typerow:last-child { border-bottom:none; }
+  .typerow .tag { width:110px; flex:none; font-size:12px; color:var(--gray-warm); font-family:ui-monospace,Consolas,monospace; }
+
+  /* buttons */
+  .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+  .btn { border:none; cursor:pointer; font-family:inherit; font-weight:600; border-radius:var(--r-md); transition:background .12s ease-out, box-shadow .12s ease-out; }
+  .btn-lg { height:44px; padding:0 22px; font-size:16px; }
+  .btn-md { height:36px; padding:0 16px; font-size:14px; }
+  .btn-sm { height:30px; padding:0 12px; font-size:13px; }
+  .btn-primary { background:var(--orange); color:#fff; }
+  .btn-primary:hover { background:var(--orange-deep); }
+  .btn-primary:active { background:var(--orange-pressed); }
+  .btn-secondary { background:var(--surface); color:var(--charcoal); border:1px solid var(--border); }
+  .btn-secondary:hover { background:var(--bg-hover); }
+  .btn-tertiary { background:transparent; color:var(--orange-text); }
+  .btn-tertiary:hover { background:var(--orange-soft); }
+  .btn-danger { background:var(--surface); color:var(--error); border:1px solid var(--error); }
+  .btn-disabled { background:var(--bg-hover); color:var(--gray-disabled); cursor:not-allowed; }
+  .btn:focus-visible { outline:2px solid var(--orange-deep); outline-offset:2px; }
+
+  /* badges */
+  .badge { display:inline-flex; align-items:center; gap:5px; height:22px; padding:0 9px; border-radius:999px; font-size:12px; font-weight:600; }
+  .b-info { background:var(--orange-soft); color:var(--orange-text); }
+  .b-design { background:var(--orange-text); color:#fff; }
+  .b-neutral { background:var(--bg-hover); color:var(--gray-warm); }
+  .b-error { background:var(--error-bg); color:var(--error); }
+  .b-success { background:var(--success-bg); color:var(--success); }
+  .b-warning { background:var(--warning-bg); color:var(--warning); }
+  .spin { width:11px; height:11px; border:2px solid var(--orange-text); border-top-color:transparent; border-radius:50%; animation:sp 0.9s linear infinite; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+
+  /* inputs */
+  .fields { display:grid; grid-template-columns:1fr 1fr; gap:20px; max-width:680px; }
+  .field label { display:block; font-size:13px; font-weight:600; margin-bottom:6px; }
+  .field .help { font-size:12px; color:var(--gray-warm); margin-top:5px; }
+  .field .err { font-size:12px; color:var(--error); margin-top:5px; }
+  .input { width:100%; height:40px; padding:0 12px; font:inherit; font-size:15px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-sm); color:var(--charcoal); }
+  .input:focus { outline:2px solid var(--orange-deep); outline-offset:1px; border-color:transparent; }
+  .input.error { border-color:var(--error); }
+  .undetermined { display:flex; gap:10px; align-items:center; }
+  .undetermined .input { color:var(--gray-disabled); background:var(--bg-hover); }
+  .chk { display:flex; gap:6px; align-items:center; font-size:13px; color:var(--gray-warm); white-space:nowrap; }
+  .chk input { accent-color:var(--orange-deep); width:15px; height:15px; }
+
+  /* progress */
+  .track { height:6px; background:var(--orange-soft); border-radius:999px; overflow:hidden; max-width:420px; }
+  .fill { height:100%; width:64%; background:var(--orange); border-radius:999px; }
+  .jobrow { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px dashed var(--border); max-width:420px; font-size:14px; }
+  .jobrow .fmt { width:150px; flex:none; }
+  .jobrow .st { margin-left:auto; font-size:12px; font-weight:600; }
+
+  /* dashboard demo */
+  .demo { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-xl); padding:28px; box-shadow:var(--shadow-sm); }
+  .demo-head { display:flex; align-items:center; gap:12px; margin-bottom:20px; }
+  .demo-head h3 { font-size:24px; font-weight:600; }
+  .demo-grid { display:grid; grid-template-columns:280px 1fr; gap:32px; }
+  .poster { aspect-ratio:3/4; border-radius:var(--r-lg); box-shadow:var(--shadow-lg);
+    background:linear-gradient(160deg,#2b3a67 0%,#4a5a8a 45%,#c9a86a 100%);
+    position:relative; overflow:hidden; }
+  .poster .pt { position:absolute; left:20px; right:20px; top:26px; color:#fff; font-weight:700; font-size:22px; line-height:1.25; letter-spacing:.01em; }
+  .poster .pi { position:absolute; left:20px; right:20px; bottom:20px; color:rgba(255,255,255,.92); font-size:11px; line-height:1.7; }
+  .poster-label { text-align:center; font-size:12px; color:var(--gray-warm); margin-top:10px; }
+  .thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:14px; align-content:start; }
+  .thumb { border-radius:var(--r-lg); overflow:hidden; background:var(--surface); border:1px solid var(--border); box-shadow:var(--shadow-sm); }
+  .thumb.selected { border:2px solid var(--orange); }
+  .thumb .im { aspect-ratio:1/1; background:linear-gradient(140deg,#3a4a77,#b99a5f); }
+  .thumb .im.wide { aspect-ratio:16/7; background:linear-gradient(100deg,#2b3a67,#c9a86a); }
+  .thumb .tm { padding:8px 10px; }
+  .thumb .tm b { display:block; font-size:13px; font-weight:600; }
+  .thumb .tm span { font-size:12px; color:var(--gray-warm); font-variant-numeric:tabular-nums; }
+  .credit { margin-left:auto; font-size:14px; }
+  .credit b { color:var(--orange-text); font-variant-numeric:tabular-nums; }
+  @media (max-width:760px){ .demo-grid{grid-template-columns:1fr;} .fields{grid-template-columns:1fr;} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><div class="wordmark">ACTSET</div><span>디자인 시스템 미리보기 · Stage 16</span></div>
+  <h1>콘텐츠가 주인공이고, ACTSET은 그것을 가장 잘 보여주는 무대가 된다</h1>
+
+  <h2>컬러</h2>
+  <p class="note">기본 8색 + 파생·시맨틱. 채도 오렌지는 한 화면의 5% 이하 — 넓게 칠하는 색이 아니라 찍는 색.</p>
+  <div class="swatches">
+    <div class="swatch"><div class="chip" style="background:#FF6A2A"></div><div class="meta"><b>Primary Orange</b><code>#FF6A2A</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#E95516"></div><div class="meta"><b>Deep Orange</b><code>#E95516</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#FFF0E8"></div><div class="meta"><b>Soft Orange</b><code>#FFF0E8</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#BC3E0C"></div><div class="meta"><b>Orange Text (파생)</b><code>#BC3E0C</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#1F1F1F"></div><div class="meta"><b>Charcoal</b><code>#1F1F1F</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#6B6865"></div><div class="meta"><b>Warm Gray</b><code>#6B6865</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#E7E3DF"></div><div class="meta"><b>Border</b><code>#E7E3DF</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#FAF8F5; border-bottom:1px solid var(--border)"></div><div class="meta"><b>Background</b><code>#FAF8F5</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#1B7F4B"></div><div class="meta"><b>Success</b><code>#1B7F4B</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#7A5B00"></div><div class="meta"><b>Warning</b><code>#7A5B00</code></div></div>
+    <div class="swatch"><div class="chip" style="background:#C93030"></div><div class="meta"><b>Error</b><code>#C93030</code></div></div>
+  </div>
+
+  <h2>타이포그래피</h2>
+  <p class="note">Pretendard. 숫자는 tabular-nums — 크레딧·가격·치수는 자릿수가 흔들리면 신뢰가 깨진다.</p>
+  <div>
+    <div class="typerow"><span class="tag">display 28/700</span><span style="font-size:28px;font-weight:700;">공연 홍보를 위한 한 세트</span></div>
+    <div class="typerow"><span class="tag">h1 24/600</span><span style="font-size:24px;font-weight:600;">겨울 나그네</span></div>
+    <div class="typerow"><span class="tag">h2 20/600</span><span style="font-size:20px;font-weight:600;">규격 선택</span></div>
+    <div class="typerow"><span class="tag">h3 16/600</span><span style="font-size:16px;font-weight:600;">출연진 정보</span></div>
+    <div class="typerow"><span class="tag">body 15/400</span><span>2026년 4월 25일 (토) 오후 5시 · 롯데콘서트홀</span></div>
+    <div class="typerow"><span class="tag">body-sm 13/400</span><span style="font-size:13px;color:var(--gray-warm)">A3 포스터 · 3508 × 4961 px · 300dpi</span></div>
+    <div class="typerow"><span class="tag">caption 12/400</span><span style="font-size:12px;color:var(--gray-warm)">저장됨 · 방금</span></div>
+  </div>
+
+  <h2>버튼</h2>
+  <p class="note">화면당 filled 오렌지 CTA는 1개. sm 크기는 filled 오렌지 금지(대비 규칙).</p>
+  <div class="row">
+    <button class="btn btn-lg btn-primary">일괄변환 만들기</button>
+    <button class="btn btn-md btn-secondary">이전</button>
+    <button class="btn btn-md btn-tertiary">다른 방향 보기</button>
+    <button class="btn btn-md btn-danger">삭제</button>
+    <button class="btn btn-md btn-disabled" title="필수 4항목을 채워주세요">다음</button>
+  </div>
+
+  <h2>배지</h2>
+  <p class="note">"정보 변경됨"과 "원본 변경됨"은 같은 오렌지 계열의 강도 차이로 구분. 경고는 앰버, 실패는 레드 — 오렌지와 섞이지 않는다.</p>
+  <div class="row">
+    <span class="badge b-info">정보 변경됨</span>
+    <span class="badge b-design">원본 변경됨</span>
+    <span class="badge b-neutral">일정 미정</span>
+    <span class="badge b-info"><span class="spin"></span>처리 중</span>
+    <span class="badge b-success">완료</span>
+    <span class="badge b-warning">해상도 부족</span>
+    <span class="badge b-error">실패</span>
+    <span class="badge b-neutral">다운로드 만료</span>
+  </div>
+
+  <h2>입력</h2>
+  <p class="note">미정은 오류가 아니다 — 레드·앰버를 쓰지 않고 뉴트럴로.</p>
+  <div class="fields">
+    <div class="field">
+      <label>공연명</label>
+      <input class="input" value="겨울 나그네">
+      <div class="help">포스터에 표기될 이름 그대로 입력해주세요</div>
+    </div>
+    <div class="field">
+      <label>공연 날짜</label>
+      <div class="undetermined">
+        <input class="input" value="일정 미정" disabled>
+        <label class="chk"><input type="checkbox" checked> 미정</label>
+      </div>
+      <div class="help">확정되면 언제든 수정할 수 있어요 — 모든 홍보물에 반영됩니다</div>
+    </div>
+  </div>
+
+  <h2>진행 표시</h2>
+  <p class="note">일괄변환은 규격별로 개별 상태를 보여주고, 실패분만 재시도한다.</p>
+  <div class="track"><div class="fill"></div></div>
+  <p style="font-size:13px;color:var(--gray-warm);margin:8px 0 16px;">규격을 변환하고 있어요 · 보통 20~40초</p>
+  <div class="jobrow"><span class="fmt">SNS 정방형</span><span class="badge b-success">완료</span></div>
+  <div class="jobrow"><span class="fmt">스토리</span><span class="badge b-info"><span class="spin"></span>진행 중</span></div>
+  <div class="jobrow" style="border-bottom:none"><span class="fmt">현수막 가로</span><span class="badge b-error">실패</span><button class="btn btn-sm btn-tertiary st">재시도</button></div>
+
+  <h2>⑦ 대시보드 — 포스터가 무대의 주인공</h2>
+  <p class="note">대표 포스터에만 shadow-lg. 결과물 주변 UI는 뉴트럴, 채도색은 CTA 하나와 선택 링뿐.</p>
+  <div class="demo">
+    <div class="demo-head">
+      <h3>겨울 나그네</h3>
+      <span class="badge b-info">정보 변경됨</span>
+      <span class="credit">크레딧 <b>1,200</b></span>
+      <button class="btn btn-md btn-primary" style="margin-left:16px">일괄변환 만들기</button>
+    </div>
+    <div class="demo-grid">
+      <div>
+        <div class="poster">
+          <div class="pt">겨울 나그네<br>WINTERREISE</div>
+          <div class="pi">2026.4.25 SAT 5PM<br>롯데콘서트홀 | 바리톤 김OO · 피아노 이OO<br>전석 50,000원 (조기예매 20% 할인)</div>
+        </div>
+        <div class="poster-label">대표 포스터 · 원본</div>
+      </div>
+      <div class="thumbs">
+        <div class="thumb selected"><div class="im"></div><div class="tm"><b>SNS 정방형</b><span>1080 × 1080</span></div></div>
+        <div class="thumb"><div class="im" style="aspect-ratio:4/5"></div><div class="tm"><b>SNS 세로형</b><span>1080 × 1350</span></div></div>
+        <div class="thumb"><div class="im" style="aspect-ratio:3/4"></div><div class="tm"><b>NOL티켓</b><span>750 × 1000</span></div></div>
+        <div class="thumb"><div class="im wide" style="grid-column:span 2"></div><div class="tm"><b>홈페이지 배너</b><span>1920 × 600</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <p style="margin-top:48px;font-size:12px;color:var(--gray-warm)">ACTSET 디자인 시스템 · 상세 명세는 16-디자인시스템.md · 이 미리보기의 포스터·썸네일은 그라디언트 플레이스홀더</p>
+</div>
+</body>
+</html>

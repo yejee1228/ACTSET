@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: actset
+  profiles:
+    active: web
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:55432}/${DB_NAME:actset}
+    username: ${DB_USER:actset}
+    password: ${DB_PASSWORD:actset_dev_local}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 25MB
+
+logging:
+  pattern:
+    # P-8: 요청 추적 ID를 모든 로그 라인에 심는다(비동기 job까지 이어짐 — JobService.enqueue 참고).
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{requestId:-no-request-id}] --- [%thread] %logger{36} : %msg%n"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+actset:
+  storage:
+    root: ${STORAGE_ROOT:../storage}
+  credit:
+    signup-grant: 500
+  external:
+    mock-mode: true

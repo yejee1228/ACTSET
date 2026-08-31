@@ -1,0 +1,17 @@
+# P-2 환경 분리 — 운영. 모든 시크릿(DB 비밀번호·향후 Ideogram/Qwen/SES 키)은
+# 환경변수로만 주입한다 — 이 파일에도, 다른 어떤 파일에도 실제 값을 넣지 않는다(P-2 완료기준).
+logging:
+  level:
+    com.actset: INFO
+    org.hibernate.SQL: WARN
+
+management:
+  endpoint:
+    health:
+      show-details: never
+
+actset:
+  external:
+    # 실제 벤더 키가 준비되기 전까지는 운영에서도 목업을 쓴다 — 진짜 과금이 발생하는
+    # 어댑터로 교체하는 시점에 이 값을 false로 내리고 벤더별 키를 환경변수로 추가한다.
+    mock-mode: ${EXTERNAL_MOCK_MODE:true}

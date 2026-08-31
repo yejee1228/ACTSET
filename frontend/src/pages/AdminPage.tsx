@@ -1,0 +1,208 @@
+import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Header } from '../components/Header';
+import { api } from '../lib/api';
+
+interface AdminAccount {
+  id: string; email: string; role: string; status: string; credit_balance: number; created_at: string;
+}
+interface AdminJob {
+  id: string; kind: string; status: string; error: string | null; attempts: number; created_at: string;
+}
+interface AdminMetrics {
+  funnel: { draft_projects: number; active_projects: number; completion_rate: number };
+  draft_selection: { select_count: number; regenerate_count: number; more_like_count: number; selection_rate: number };
+}
+interface UsageRow { action: string; tx_count: number; total_amount: number }
+interface AdminInquiry {
+  id: string; subject: string; message: string; contact: string | null; status: string; created_at: string;
+}
+
+/** 관리자 백오피스(1-20). role=admin만 실제로 데이터를 볼 수 있다(서버가 403/404로 막음). */
+export default function AdminPage() {
+  const queryClient = useQueryClient();
+  const [q, setQ] = useState('');
+  const [grantAmount, setGrantAmount] = useState<Record<string, string>>({});
+
+  const { data: accounts } = useQuery({
+    queryKey: ['admin', 'accounts', q],
+    queryFn: () => api.get<{ items: AdminAccount[] }>(`/admin/accounts${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  });
+  const { data: jobs } = useQuery({
+    queryKey: ['admin', 'jobs'],
+    queryFn: () => api.get<{ items: AdminJob[] }>('/admin/jobs'),
+  });
+  const { data: metrics } = useQuery({
+    queryKey: ['admin', 'metrics'],
+    queryFn: () => api.get<AdminMetrics>('/admin/metrics'),
+  });
+  const { data: usage } = useQuery({
+    queryKey: ['admin', 'usage'],
+    queryFn: () => api.get<{ by_action: UsageRow[] }>('/admin/usage'),
+  });
+  const { data: inquiries } = useQuery({
+    queryKey: ['admin', 'inquiries'],
+    queryFn: () => api.get<{ items: AdminInquiry[] }>('/admin/inquiries'),
+  });
+
+  const resolveInquiry = useMutation({
+    mutationFn: (id: string) => api.patch(`/admin/inquiries/${id}`, { status: 'closed' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'inquiries'] }),
+  });
+
+  const grant = useMutation({
+    mutationFn: ({ id, amount }: { id: string; amount: number }) =>
+      api.post(`/admin/accounts/${id}/credits`, { amount, reason: '관리자 지급' }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'accounts'] }),
+  });
+
+  const retry = useMutation({
+    mutationFn: (id: string) => api.post(`/admin/jobs/${id}/retry`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['admin', 'jobs'] }),
+  });
+
+  return (
+    <div>
+      <Header />
+      <div className="page">
+        <h1 className="h1" style={{ marginBottom: 'var(--sp-6)' }}>관리자 백오피스</h1>
+
+        <section style={{ marginBottom: 'var(--sp-8)' }}>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>사용 지표 (6-6)</h2>
+          <div style={{ display: 'flex', gap: 'var(--sp-4)', flexWrap: 'wrap' }}>
+            <div className="card" style={{ padding: 'var(--sp-4)', minWidth: 180 }}>
+              <p className="caption">완주율 (활성/전체 프로젝트)</p>
+              <p className="h2 tabular">{metrics ? `${(metrics.funnel.completion_rate * 100).toFixed(1)}%` : '-'}</p>
+              <p className="caption">{metrics?.funnel.active_projects ?? '-'} / {metrics ? metrics.funnel.draft_projects + metrics.funnel.active_projects : '-'}</p>
+            </div>
+            <div className="card" style={{ padding: 'var(--sp-4)', minWidth: 180 }}>
+              <p className="caption">시안 선택률</p>
+              <p className="h2 tabular">{metrics ? `${(metrics.draft_selection.selection_rate * 100).toFixed(1)}%` : '-'}</p>
+              <p className="caption">선택 {metrics?.draft_selection.select_count ?? 0} · 재생성 {metrics?.draft_selection.regenerate_count ?? 0} · 더보기 {metrics?.draft_selection.more_like_count ?? 0}</p>
+            </div>
+          </div>
+        </section>
+
+        <section style={{ marginBottom: 'var(--sp-8)' }}>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>크레딧 소비 분포 (6-8)</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="body-sm">
+                <th style={{ textAlign: 'left', padding: 8 }}>액션</th>
+                <th style={{ textAlign: 'right', padding: 8 }}>건수</th>
+                <th style={{ textAlign: 'right', padding: 8 }}>총 크레딧</th>
+              </tr>
+            </thead>
+            <tbody>
+              {usage?.by_action.map((row) => (
+                <tr key={row.action} className="body-sm" style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8 }}>{row.action}</td>
+                  <td style={{ padding: 8, textAlign: 'right' }} className="tabular">{row.tx_count}</td>
+                  <td style={{ padding: 8, textAlign: 'right' }} className="tabular">{row.total_amount.toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <section style={{ marginBottom: 'var(--sp-8)' }}>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>고객 문의 수신함 (6-5b)</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="body-sm">
+                <th style={{ textAlign: 'left', padding: 8 }}>제목</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>내용</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>연락처</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>상태</th>
+                <th style={{ padding: 8 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {inquiries?.items.map((i) => (
+                <tr key={i.id} className="body-sm" style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8 }}>{i.subject}</td>
+                  <td style={{ padding: 8, maxWidth: 320 }}>{i.message}</td>
+                  <td style={{ padding: 8 }}>{i.contact}</td>
+                  <td style={{ padding: 8 }}>
+                    <span className={i.status === 'closed' ? 'badge badge-success' : 'badge badge-neutral'}>{i.status}</span>
+                  </td>
+                  <td style={{ padding: 8 }}>
+                    {i.status !== 'closed' && (
+                      <button className="btn btn-tertiary btn-sm" onClick={() => resolveInquiry.mutate(i.id)}>처리완료</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <section style={{ marginBottom: 'var(--sp-8)' }}>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>계정</h2>
+          <input className="input" placeholder="이메일 검색" style={{ maxWidth: 280, marginBottom: 'var(--sp-3)' }}
+                 value={q} onChange={(e) => setQ(e.target.value)} />
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="body-sm">
+                <th style={{ textAlign: 'left', padding: 8 }}>이메일</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>역할</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>상태</th>
+                <th style={{ textAlign: 'right', padding: 8 }}>크레딧</th>
+                <th style={{ padding: 8 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts?.items.map((a) => (
+                <tr key={a.id} className="body-sm" style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8 }}>{a.email}</td>
+                  <td style={{ padding: 8 }}>{a.role}</td>
+                  <td style={{ padding: 8 }}>{a.status}</td>
+                  <td style={{ padding: 8, textAlign: 'right' }} className="tabular">{a.credit_balance.toLocaleString()}</td>
+                  <td style={{ padding: 8, display: 'flex', gap: 4 }}>
+                    <input className="input" style={{ width: 90, height: 30 }} placeholder="+금액"
+                           value={grantAmount[a.id] ?? ''}
+                           onChange={(e) => setGrantAmount({ ...grantAmount, [a.id]: e.target.value })} />
+                    <button className="btn btn-secondary btn-sm" onClick={() => {
+                      const amount = Number(grantAmount[a.id]);
+                      if (amount) grant.mutate({ id: a.id, amount });
+                    }}>지급</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+
+        <section>
+          <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>실패·대기 작업</h2>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr className="body-sm">
+                <th style={{ textAlign: 'left', padding: 8 }}>종류</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>상태</th>
+                <th style={{ textAlign: 'left', padding: 8 }}>오류</th>
+                <th style={{ padding: 8 }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {jobs?.items.map((j) => (
+                <tr key={j.id} className="body-sm" style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: 8 }}>{j.kind}</td>
+                  <td style={{ padding: 8 }}>
+                    <span className={j.status === 'failed' ? 'badge badge-error' : 'badge badge-neutral'}>{j.status}</span>
+                  </td>
+                  <td style={{ padding: 8 }}>{j.error}</td>
+                  <td style={{ padding: 8 }}>
+                    {j.status === 'failed' && (
+                      <button className="btn btn-tertiary btn-sm" onClick={() => retry.mutate(j.id)}>재시도</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      </div>
+    </div>
+  );
+}
