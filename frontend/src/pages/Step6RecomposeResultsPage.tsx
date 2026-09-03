@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
-import { api, AssetItem } from '../lib/api';
+import { api, ApiError, AssetItem } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
 
 interface ChildJob { job_id: string; status: string; error: string | null; format_code: string | null }
@@ -16,6 +16,8 @@ export default function Step6RecomposeResultsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [activeFormat, setActiveFormat] = useState<string | null>(null);
+  const [regenJobId, setRegenJobId] = useState<string | null>(null);
+  const [regenError, setRegenError] = useState<string | null>(null);
 
   useEffect(() => { trackFunnelStep('step_6_recompose_results'); }, []);
 
@@ -40,6 +42,36 @@ export default function Step6RecomposeResultsPage() {
   const select = useMutation({
     mutationFn: (assetId: string) => api.post(`/assets/${assetId}/select`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets', id, '규격변환'] }),
+  });
+
+  const { data: regenJob } = useQuery({
+    queryKey: ['job', regenJobId],
+    queryFn: () => api.get<JobStatusDetail>(`/jobs/${regenJobId}`),
+    enabled: !!regenJobId,
+    refetchInterval: (query) => (query.state.data?.status === 'succeeded' || query.state.data?.status === 'failed' ? false : 2500),
+  });
+
+  useEffect(() => {
+    if (!regenJobId || !regenJob) return;
+    if (regenJob.status === 'succeeded') {
+      queryClient.invalidateQueries({ queryKey: ['assets', id, '규격변환'] });
+      setRegenJobId(null);
+    } else if (regenJob.status === 'failed') {
+      setRegenError('재생성에 실패했습니다. 크레딧은 자동 환불되었습니다.');
+      setRegenJobId(null);
+    }
+  }, [regenJob, regenJobId, id, queryClient]);
+
+  const regenerate = useMutation({
+    mutationFn: () => api.post<{ job_id: string; children: { job_id: string; format_code: string }[] }>(
+      `/projects/${id}/recompose`,
+      { format_codes: [activeFormat], variants_per_format: 3, mode: 'regenerate' },
+    ),
+    onSuccess: (res) => {
+      setRegenError(null);
+      setRegenJobId(res.children[0]?.job_id ?? null);
+    },
+    onError: (err) => setRegenError(err instanceof ApiError ? err.message : '요청에 실패했습니다.'),
   });
 
   const children = job?.children ?? [];
@@ -79,6 +111,16 @@ export default function Step6RecomposeResultsPage() {
           <p className="body-sm" style={{ color: 'var(--error)', marginBottom: 'var(--sp-4)' }}>
             이 규격은 생성에 실패했습니다. 크레딧은 자동 환불되었습니다.
           </p>
+        )}
+
+        {activeFormat && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)', marginBottom: 'var(--sp-4)' }}>
+            <button className="btn btn-secondary btn-sm" disabled={!!regenJobId || regenerate.isPending}
+                    onClick={() => { setRegenError(null); regenerate.mutate(); }}>
+              {regenJobId ? '재생성 중…' : `${activeFormat} 재생성`}
+            </button>
+            {regenError && <span className="body-sm" style={{ color: 'var(--error)' }}>{regenError}</span>}
+          </div>
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-4)' }}>

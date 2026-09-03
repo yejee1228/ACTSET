@@ -45,7 +45,7 @@ public class RecomposeService {
     }
 
     @Transactional
-    public RecomposeResult requestRecompose(UUID projectId, UUID ownerId, List<String> formatCodes, int variantsPerFormat) {
+    public RecomposeResult requestRecompose(UUID projectId, UUID ownerId, List<String> formatCodes, int variantsPerFormat, String mode) {
         Project project = projectService.getOwned(projectId, ownerId);
         if (project.getDesignAssets() == null || !project.getDesignAssets().has("visual_layers")
                 || project.getDesignAssets().get("visual_layers").isEmpty()) {
@@ -85,7 +85,9 @@ public class RecomposeService {
             payload.put("variants", variantsPerFormat);
 
             Job child = jobService.enqueue("recompose", projectId, payload, parent.getId());
-            creditService.consume(ownerId, costEstimateService.recomposeCostPerFormat(), child.getId(), "규격 변환 " + code);
+            int cost = costEstimateService.recomposeCostPerFormat(mode);
+            String label = "regenerate".equals(mode) ? "규격 재생성 " : "규격 변환 ";
+            creditService.consume(ownerId, cost, child.getId(), label + code);
             children.add(new ChildJob(child.getId(), code));
         }
 

@@ -54,9 +54,9 @@ public class CreditController {
     @GetMapping("/api/v1/credits/estimate")
     public Map<String, Object> estimate(@RequestParam String kind,
                                           @RequestParam(required = false) List<String> format_codes,
-                                          @RequestParam(defaultValue = "3") int variants) {
+                                          @RequestParam(defaultValue = "initial") String mode) {
         Account account = accountRepository.findById(CurrentUser.id()).orElseThrow(ApiException::notFound);
-        int cost = costEstimateService.estimate(kind, format_codes, variants);
+        int cost = costEstimateService.estimate(kind, format_codes, mode);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("estimated_cost", cost);
