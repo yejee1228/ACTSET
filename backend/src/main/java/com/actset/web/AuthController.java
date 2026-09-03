@@ -39,7 +39,7 @@ public class AuthController {
     private final MailSender mailSender;
     private final PasswordResetService passwordResetService;
 
-    @Value("${actset.credit.signup-grant:500}")
+    @Value("${actset.credit.signup-grant:50}")
     private int signupGrant;
 
     public AuthController(AccountRepository accountRepository, PasswordEncoder passwordEncoder,

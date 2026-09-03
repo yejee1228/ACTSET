@@ -199,14 +199,17 @@ kind: performance_photo | cast_photo | logo | reference_image
 
 ```json
 // 요청
-{ "format_codes": ["SNS_1X1", "STORY", "BANNER_WIDE"], "variants_per_format": 3 }
+{ "format_codes": ["SNS_1X1", "STORY", "BANNER_WIDE"],
+  "variants_per_format": 3,
+  "mode": "initial"          // initial(기본) | regenerate — ⑥에서 같은 규격을 다시 뽑을 때 regenerate
+}
 
 // 202
 { "job_id": "uuid",
   "children": [ { "job_id": "uuid", "format_code": "SNS_1X1" }, ... ] }
 ```
 
-규격별 하위 작업으로 나뉘므로 일부가 실패해도 나머지는 살아남는다. `format_codes`에 `POSTER`가 포함되면 새 레코드를 만들지 않고 기존 포스터를 교체하며, DesignAssets가 갱신되어 다른 결과물이 `stale_design` 상태가 된다.
+규격별 하위 작업으로 나뉘므로 일부가 실패해도 나머지는 살아남는다. `format_codes`에 `POSTER`가 포함되면 새 레코드를 만들지 않고 기존 포스터를 교체하며, DesignAssets가 갱신되어 다른 결과물이 `stale_design` 상태가 된다. `mode`에 따라 크레딧 단가가 다르다(Stage 6 — `initial` 2C, `regenerate` 1C, 규격당).
 
 ### `POST /projects/{id}/resync`
 ⑦ "최신 반영". 정보·원본이 어긋난 결과물을 다시 렌더링한다.
@@ -362,7 +365,9 @@ kind: performance_photo | cast_photo | logo | reference_image
 ### `GET /credits/estimate`
 생성 전에 소비량을 미리 알려준다. 화면의 확인 모달이 이 값을 쓴다.
 
-`?kind=recompose&format_codes=SNS_1X1,STORY&variants=3`
+`?kind=recompose&format_codes=SNS_1X1,STORY&mode=initial`
+
+`mode`는 `initial`(기본값) | `regenerate`. `kind=draft_generate`에도 동일하게 적용된다(생략 시 `initial`). 시안 생성은 3장 세트 정액이라 장수와 무관하고, 규격 변환은 `format_codes` 개수 × 규격당 단가로 계산한다(Stage 6).
 
 ```json
 { "estimated_cost": 60, "balance": 1200, "sufficient": true }

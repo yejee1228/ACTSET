@@ -22,13 +22,14 @@ public class RecomposeController {
         this.recomposeService = recomposeService;
     }
 
-    public record RecomposeRequest(List<String> format_codes, Integer variants_per_format) {
+    public record RecomposeRequest(List<String> format_codes, Integer variants_per_format, String mode) {
     }
 
     @PostMapping
     public ResponseEntity<Map<String, Object>> requestRecompose(@PathVariable UUID id, @RequestBody RecomposeRequest req) {
         int variants = req.variants_per_format() != null ? req.variants_per_format() : 3;
-        RecomposeService.RecomposeResult result = recomposeService.requestRecompose(id, CurrentUser.id(), req.format_codes(), variants);
+        String mode = req.mode() != null ? req.mode() : "initial";
+        RecomposeService.RecomposeResult result = recomposeService.requestRecompose(id, CurrentUser.id(), req.format_codes(), variants, mode);
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("job_id", result.parentJobId().toString());

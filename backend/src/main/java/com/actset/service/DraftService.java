@@ -61,7 +61,7 @@ public class DraftService {
         payload.put("count", count);
 
         Job job = jobService.enqueue("draft_generate", project.getId(), payload);
-        int cost = costEstimateService.draftCost(count);
+        int cost = costEstimateService.draftCost(mode);
         creditService.consume(ownerId, cost, job.getId(), "시안 생성 " + count + "장(" + mode + ")");
         return job.getId();
     }
