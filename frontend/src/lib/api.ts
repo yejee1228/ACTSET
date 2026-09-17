@@ -127,6 +127,8 @@ export interface AssetItem {
   downloadable: boolean;
   status: string;
   is_favorited: boolean;
+  prompt?: string | null;
+  negative_prompt?: string | null;
   stale: { info: boolean; design: boolean };
 }
 

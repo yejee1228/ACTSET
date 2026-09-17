@@ -104,6 +104,11 @@ public class AssetController {
         m.put("downloadable", downloadable);
         m.put("status", a.getStatus());
         m.put("is_favorited", a.isFavorited());
+        // 실제 벤더 호출에 쓰인 프롬프트 — 문의 대응·디버깅용 투명성(Stage 5·11).
+        if (a.getGenerationParams() != null) {
+            m.put("prompt", a.getGenerationParams().path("prompt").asText(null));
+            m.put("negative_prompt", a.getGenerationParams().path("negative_prompt").asText(null));
+        }
         boolean infoStale = project.getInfoUpdatedAt() != null
                 && (a.getInfoSyncedAt() == null || project.getInfoUpdatedAt().isAfter(a.getInfoSyncedAt()));
         boolean designStale = project.getDesignUpdatedAt() != null

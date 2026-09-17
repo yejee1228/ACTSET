@@ -14,6 +14,7 @@ import com.actset.render.PerformanceInfoTextMapper;
 import com.actset.render.PhotoLayerRenderer;
 import com.actset.render.PosterTextRenderer;
 import com.actset.render.TextBlockSpec;
+import com.actset.repository.GeneratedAssetRepository;
 import com.actset.repository.ProjectRepository;
 import com.actset.repository.UploadedFileRepository;
 import com.actset.service.GeneratedAssetService;
@@ -49,6 +50,7 @@ public class DraftGenerateJobHandler implements JobHandler {
 
     private final ProjectRepository projectRepository;
     private final UploadedFileRepository uploadedFileRepository;
+    private final GeneratedAssetRepository generatedAssetRepository;
     private final StorageService storageService;
     private final DraftPromptBuilder promptBuilder;
     private final ImageGenerationAdapter imageGenerationAdapter;
@@ -60,6 +62,7 @@ public class DraftGenerateJobHandler implements JobHandler {
 
     public DraftGenerateJobHandler(ProjectRepository projectRepository,
                                     UploadedFileRepository uploadedFileRepository,
+                                    GeneratedAssetRepository generatedAssetRepository,
                                     StorageService storageService,
                                     DraftPromptBuilder promptBuilder,
                                     ImageGenerationAdapter imageGenerationAdapter,
@@ -70,6 +73,7 @@ public class DraftGenerateJobHandler implements JobHandler {
                                     ObjectMapper objectMapper) {
         this.projectRepository = projectRepository;
         this.uploadedFileRepository = uploadedFileRepository;
+        this.generatedAssetRepository = generatedAssetRepository;
         this.storageService = storageService;
         this.promptBuilder = promptBuilder;
         this.imageGenerationAdapter = imageGenerationAdapter;
@@ -88,8 +92,21 @@ public class DraftGenerateJobHandler implements JobHandler {
     @Override
     public ObjectNode handle(Job job) throws Exception {
         Project project = projectRepository.findById(job.getProjectId()).orElseThrow(ApiException::notFound);
-        int count = job.getPayload() != null && job.getPayload().has("count")
-                ? job.getPayload().get("count").asInt(3) : 3;
+        JsonNode payload = job.getPayload();
+        int count = payload != null && payload.has("count") ? payload.get("count").asInt(3) : 3;
+        String mode = payload != null && payload.has("mode") ? payload.get("mode").asText("initial") : "initial";
+
+        // 이 방향으로 더 보기(more_like) — 참고 후보의 seed·styleType을 재사용한다(docs/03 4개 액션).
+        String referenceSeed = null;
+        String referenceStyle = null;
+        if ("more_like".equals(mode) && payload != null && payload.hasNonNull("reference_candidate_id")) {
+            UUID referenceCandidateId = UUID.fromString(payload.get("reference_candidate_id").asText());
+            GeneratedAsset reference = generatedAssetRepository.findById(referenceCandidateId).orElse(null);
+            if (reference != null && reference.getGenerationParams() != null) {
+                referenceSeed = reference.getGenerationParams().path("seed").asText(null);
+                referenceStyle = reference.getGenerationParams().path("style_type").asText(null);
+            }
+        }
 
         JsonNode info = project.getPerformanceInfo();
         List<String> referenceImagePaths = uploadedFileRepository.findByProjectId(project.getId()).stream()
@@ -106,10 +123,18 @@ public class DraftGenerateJobHandler implements JobHandler {
         String title = textMapper.title(info);
         List<TextBlockSpec> infoBlocks = textMapper.infoBlocks(info);
 
+        // 7-6 "참고해서 만들기"(Stage 5 4-2·17) — 있으면 팔레트 힌트만 프롬프트에 실어 보낸다.
+        List<String> referencePalette = new ArrayList<>();
+        if (project.getDesignAssets() != null) {
+            project.getDesignAssets().path("reference_style_hint").path("palette")
+                    .forEach(node -> referencePalette.add(node.asText()));
+        }
+
         ArrayNode candidateIds = objectMapper.createArrayNode();
 
         for (int i = 0; i < count; i++) {
-            ImageGenerationRequest request = promptBuilder.build(info, referenceImagePaths, width, height);
+            ImageGenerationRequest request = promptBuilder.build(info, referenceImagePaths, width, height,
+                    referencePalette, mode, referenceSeed, referenceStyle);
             ImageGenerationResult generated = imageGenerationAdapter.generate(request);
 
             BufferedImage backdrop = ImageIO.read(new ByteArrayInputStream(generated.imageBytes()));
@@ -135,6 +160,17 @@ public class DraftGenerateJobHandler implements JobHandler {
             generationParams.put("genre", request.genre());
             generationParams.put("image_direction_note", request.imageDirectionNote());
             generationParams.put("variant_index", i);
+            generationParams.put("mode", mode);
+            // 실제로 벤더에 전송된 텍스트 그대로 — 문의 대응·디버깅용(사용자가 결과를 이해할 수 있도록).
+            generationParams.put("prompt", request.prompt());
+            generationParams.put("negative_prompt", request.negativePrompt());
+            if (request.styleType() != null) {
+                generationParams.put("style_type", request.styleType());
+            }
+            if (!referencePalette.isEmpty()) {
+                ArrayNode paletteNode = generationParams.putArray("reference_palette");
+                referencePalette.forEach(paletteNode::add);
+            }
 
             GeneratedAsset asset = generatedAssetService.saveCandidate(
                     project.getId(), FormatPreset.POSTER.code(), width, height, i,

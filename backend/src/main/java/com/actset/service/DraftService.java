@@ -43,7 +43,7 @@ public class DraftService {
     }
 
     @Transactional
-    public UUID requestDrafts(UUID projectId, UUID ownerId, String mode, int count) {
+    public UUID requestDrafts(UUID projectId, UUID ownerId, String mode, int count, UUID referenceCandidateId) {
         Project project = projectService.getOwned(projectId, ownerId);
 
         // 1-23: 차단 시 크레딧을 차감하지 않는다 — consume()보다 먼저 검사한다.
@@ -59,6 +59,9 @@ public class DraftService {
         ObjectNode payload = objectMapper.createObjectNode();
         payload.put("mode", mode);
         payload.put("count", count);
+        if (referenceCandidateId != null) {
+            payload.put("reference_candidate_id", referenceCandidateId.toString());
+        }
 
         Job job = jobService.enqueue("draft_generate", project.getId(), payload);
         int cost = costEstimateService.draftCost(mode);

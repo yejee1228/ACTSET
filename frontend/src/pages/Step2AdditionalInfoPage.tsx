@@ -43,6 +43,7 @@ export default function Step2AdditionalInfoPage() {
   const [introduction, setIntroduction] = useState('');
   const [mandatoryNotices, setMandatoryNotices] = useState('');
   const [imageDirectionNote, setImageDirectionNote] = useState('');
+  const [imageAvoidNote, setImageAvoidNote] = useState('');
 
   useEffect(() => {
     if (!project) return;
@@ -59,6 +60,7 @@ export default function Step2AdditionalInfoPage() {
     setIntroduction(info.introduction ?? '');
     setMandatoryNotices((info.mandatory_notices ?? []).join(', '));
     setImageDirectionNote(info.image_direction_note ?? '');
+    setImageAvoidNote(info.image_avoid_note ?? '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
     // project 참조 전체에 의존한다(InfoEditPage에서 발견한 stale 캐시 버그와 동일 원인).
   }, [project]);
@@ -216,6 +218,15 @@ export default function Step2AdditionalInfoPage() {
                 <textarea className="textarea" value={imageDirectionNote}
                           placeholder="예: 차분한 블루톤, 인물 사진은 크게"
                           onChange={(e) => { setImageDirectionNote(e.target.value); debouncedSave({ image_direction_note: e.target.value }); }} />
+              </div>
+              <div>
+                <label className="field-label">피하고 싶은 이미지 요소</label>
+                <textarea className="textarea" value={imageAvoidNote}
+                          placeholder="예: 특정 인물 이미지, 과도한 반짝임 — 원하는 방향과 별도로 제외할 것만 적어주세요"
+                          onChange={(e) => { setImageAvoidNote(e.target.value); debouncedSave({ image_avoid_note: e.target.value }); }} />
+                <p className="caption" style={{ marginTop: 'var(--sp-1)', color: 'var(--gray-warm)' }}>
+                  "~않도록", "~피해서" 같은 문장 대신 제외할 요소만 단어로 적으면 더 정확하게 반영됩니다.
+                </p>
               </div>
             </div>
           )}
