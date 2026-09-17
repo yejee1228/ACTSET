@@ -41,6 +41,4 @@ actset:
   storage:
     root: ${STORAGE_ROOT:../storage}
   credit:
-    signup-grant: 50
-  external:
-    mock-mode: true
+    signup-grant: 20

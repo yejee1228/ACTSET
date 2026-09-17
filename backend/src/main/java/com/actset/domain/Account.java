@@ -61,6 +61,10 @@ public class Account {
     @Column(name = "credit_balance", nullable = false)
     private Integer creditBalance = 0;
 
+    /** 구독(Subscription) 스키마 훅 — MVP는 항상 'free'다(Stage 6·17). */
+    @Column(nullable = false)
+    private String plan = "free";
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 

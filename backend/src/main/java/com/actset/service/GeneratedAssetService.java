@@ -1,9 +1,11 @@
 package com.actset.service;
 
+import com.actset.common.ApiException;
 import com.actset.domain.GeneratedAsset;
 import com.actset.repository.GeneratedAssetRepository;
 import com.actset.storage.StorageService;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,6 +15,7 @@ import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.Duration;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -23,6 +26,9 @@ import java.util.UUID;
 public class GeneratedAssetService {
 
     private static final int PREVIEW_LONG_EDGE = 800;
+
+    /** 후보함 상한(Stage 2·6·11·17) — 재생성(유료)과 구분되는 무과금 액션이다. */
+    private static final int FAVORITE_LIMIT = 5;
 
     private final GeneratedAssetRepository generatedAssetRepository;
     private final StorageService storageService;
@@ -104,6 +110,23 @@ public class GeneratedAssetService {
     public String toSignedUrl(String storedPath) {
         if (storedPath == null) return null;
         return storageService.signedUrl(storedPath, Duration.ofHours(1));
+    }
+
+    /**
+     * 후보함 즐겨찾기 추가·해제(7-5, Stage 2·17). 무과금 — CreditService를 거치지 않는다.
+     * 5개 초과 시도는 409로 거부하고, 해제는 제한과 무관하게 항상 허용한다.
+     */
+    @Transactional
+    public GeneratedAsset setFavorited(GeneratedAsset asset, boolean favorited) {
+        if (favorited && !asset.isFavorited()) {
+            long count = generatedAssetRepository.countByProjectIdAndFavoritedTrueAndDeletedAtIsNull(asset.getProjectId());
+            if (count >= FAVORITE_LIMIT) {
+                throw new ApiException(HttpStatus.CONFLICT, "FAVORITE_LIMIT_EXCEEDED",
+                        "후보함은 최대 5개까지 담을 수 있습니다.", Map.of("limit", FAVORITE_LIMIT));
+            }
+        }
+        asset.setFavorited(favorited);
+        return generatedAssetRepository.save(asset);
     }
 
     private BufferedImage downscale(BufferedImage src, int longEdge) {

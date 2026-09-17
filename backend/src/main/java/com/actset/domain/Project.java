@@ -29,6 +29,13 @@ public class Project {
     @Column(nullable = false)
     private String status = "draft";
 
+    /** Gallery 노출 여부(Stage 2·17). active 상태에서만 public 전환을 허용한다(서비스 계층에서 검증). */
+    @Column(nullable = false)
+    private String visibility = "private";
+
+    @Column(name = "published_at")
+    private Instant publishedAt;
+
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
@@ -75,5 +82,9 @@ public class Project {
 
     public boolean isActive() {
         return "active".equals(status);
+    }
+
+    public boolean isPublic() {
+        return "public".equals(visibility);
     }
 }

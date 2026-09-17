@@ -54,6 +54,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/signup", "/api/v1/auth/login",
                         "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm").permitAll()
                 .requestMatchers("/api/v1/formats", "/api/v1/system/status", "/api/v1/funnel-events").permitAll()
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/gallery/**", "/api/v1/gallery").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

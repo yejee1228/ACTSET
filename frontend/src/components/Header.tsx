@@ -23,9 +23,14 @@ export function Header() {
         background: 'var(--surface)',
       }}
     >
-      <Link to="/home" style={{ fontWeight: 700, fontSize: 18, color: 'var(--charcoal)', textDecoration: 'none' }}>
-        ACTSET
-      </Link>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-5)' }}>
+        <Link to="/home" style={{ fontWeight: 700, fontSize: 18, color: 'var(--charcoal)', textDecoration: 'none' }}>
+          ACTSET
+        </Link>
+        <Link to="/gallery" className="body-sm" style={{ color: 'var(--gray-warm)', textDecoration: 'none' }}>
+          Gallery
+        </Link>
+      </div>
       {account && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-4)' }}>
           <Link to="/credits" className="body-sm tabular" style={{ textDecoration: 'none' }}>

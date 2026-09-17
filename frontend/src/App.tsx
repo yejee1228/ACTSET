@@ -19,6 +19,8 @@ import AccountSettingsPage from './pages/AccountSettingsPage';
 import CreditsPage from './pages/CreditsPage';
 import SupportPage from './pages/SupportPage';
 import AdminPage from './pages/AdminPage';
+import GalleryListPage from './pages/GalleryListPage';
+import GalleryDetailPage from './pages/GalleryDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
 import { RequireAuth } from './components/RequireAuth';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
@@ -34,6 +36,8 @@ export default function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/gallery" element={<GalleryListPage />} />
+        <Route path="/gallery/:id" element={<GalleryDetailPage />} />
 
         <Route path="/home" element={<RequireAuth><HomePage /></RequireAuth>} />
         <Route path="/account" element={<RequireAuth><AccountSettingsPage /></RequireAuth>} />

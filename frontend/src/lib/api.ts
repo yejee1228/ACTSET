@@ -65,6 +65,7 @@ export interface Account {
   email: string;
   role: string;
   credit_balance: number;
+  plan: 'free' | 'subscriber';
 }
 
 export interface ProjectSummary {
@@ -84,7 +85,26 @@ export interface ProjectDetail {
   genre: string | null;
   performance_info: Record<string, unknown>;
   design_assets: Record<string, unknown> | null;
+  visibility: 'private' | 'public';
+  published_at: string | null;
   flags: { date_undetermined: boolean; venue_undetermined: boolean };
+}
+
+export interface GalleryItem {
+  project_id: string;
+  main_title: string;
+  genre: string | null;
+  primary_date: string | null;
+  thumbnail_url: string | null;
+}
+
+export interface GalleryDetail {
+  project_id: string;
+  main_title: string;
+  genre: string | null;
+  primary_date: string | null;
+  venue_name: string | null;
+  poster_preview_url: string | null;
 }
 
 export interface JobStatus {
@@ -106,6 +126,7 @@ export interface AssetItem {
   image_url: string | null;
   downloadable: boolean;
   status: string;
+  is_favorited: boolean;
   stale: { info: boolean; design: boolean };
 }
 

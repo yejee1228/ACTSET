@@ -41,6 +41,28 @@ public class AssetController {
         return ResponseEntity.noContent().build();
     }
 
+    /** 7-5 후보함 즐겨찾기(Stage 2·6·11·17) — 무과금, 최대 5개. */
+    @PostMapping("/api/v1/assets/{id}/favorite")
+    public Map<String, Object> favorite(@PathVariable UUID id) {
+        return setFavorited(id, true);
+    }
+
+    @DeleteMapping("/api/v1/assets/{id}/favorite")
+    public Map<String, Object> unfavorite(@PathVariable UUID id) {
+        return setFavorited(id, false);
+    }
+
+    private Map<String, Object> setFavorited(UUID assetId, boolean favorited) {
+        GeneratedAsset asset = generatedAssetRepository.findById(assetId).orElseThrow(ApiException::notFound);
+        Project project = projectService.getOwned(asset.getProjectId(), CurrentUser.id());
+        asset = generatedAssetService.setFavorited(asset, favorited);
+        long favoritedCount = generatedAssetRepository.countByProjectIdAndFavoritedTrueAndDeletedAtIsNull(project.getId());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("is_favorited", asset.isFavorited());
+        body.put("favorited_count", favoritedCount);
+        return body;
+    }
+
     /** 4-6 개별 삭제 — 소프트 삭제, 30일 뒤 하드 삭제(4-8, 미착수). 포스터는 삭제 불가(docs/11). */
     @DeleteMapping("/api/v1/assets/{id}")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
@@ -81,6 +103,7 @@ public class AssetController {
         m.put("image_url", downloadable ? generatedAssetService.toSignedUrl(a.getImageUrl()) : null);
         m.put("downloadable", downloadable);
         m.put("status", a.getStatus());
+        m.put("is_favorited", a.isFavorited());
         boolean infoStale = project.getInfoUpdatedAt() != null
                 && (a.getInfoSyncedAt() == null || project.getInfoUpdatedAt().isAfter(a.getInfoSyncedAt()));
         boolean designStale = project.getDesignUpdatedAt() != null

@@ -61,6 +61,10 @@ public class GeneratedAsset {
     @Column(name = "auto_sync_text", nullable = false)
     private boolean autoSyncText = false;
 
+    /** 후보함(Stage 2·17). 프로젝트당 true 최대 5개 — 서비스 계층에서 강제. 무과금. */
+    @Column(name = "is_favorited", nullable = false)
+    private boolean favorited = false;
+
     /** 제안됨 / 선택됨 / 보관 / 삭제됨 */
     @Column(nullable = false)
     private String status;

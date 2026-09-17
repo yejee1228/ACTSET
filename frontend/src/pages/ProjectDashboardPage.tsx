@@ -25,6 +25,7 @@ export default function ProjectDashboardPage() {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
+  const [confirmingVisibility, setConfirmingVisibility] = useState(false);
 
   useEffect(() => { trackFunnelStep('dashboard'); }, []);
 
@@ -57,6 +58,15 @@ export default function ProjectDashboardPage() {
   const deleteAsset = useMutation({
     mutationFn: (assetId: string) => api.del(`/assets/${assetId}`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets', id, '규격변환'] }),
+  });
+
+  const setVisibility = useMutation({
+    mutationFn: (visibility: 'private' | 'public') =>
+      api.post<{ visibility: string; published_at: string | null }>(`/projects/${id}/visibility`, { visibility }),
+    onSuccess: () => {
+      setConfirmingVisibility(false);
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+    },
   });
 
   const poster = posterData?.items[0];
@@ -132,6 +142,33 @@ export default function ProjectDashboardPage() {
               )}
               <button className="btn btn-tertiary btn-sm" onClick={() => navigate(`/projects/${id}/drafts`)}>다시 만들기</button>
             </div>
+
+            {project?.status === 'active' && (
+              <div style={{ marginTop: 'var(--sp-4)', paddingTop: 'var(--sp-4)', borderTop: '1px solid var(--border)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-2)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={project.visibility === 'public'}
+                    onChange={() => {
+                      if (project.visibility === 'public') setVisibility.mutate('private');
+                      else setConfirmingVisibility(true);
+                    }}
+                  />
+                  <span className="body-sm">Gallery에 공개</span>
+                </label>
+                {confirmingVisibility && (
+                  <div className="card" style={{ padding: 'var(--sp-3)', marginTop: 'var(--sp-2)', background: 'var(--bg-hover)' }}>
+                    <p className="body-sm" style={{ marginBottom: 'var(--sp-2)' }}>
+                      공개하면 다른 사용자가 이 포스터와 공연정보를 볼 수 있습니다. 출연진 동의를 이미 확보했는지 확인해주세요.
+                    </p>
+                    <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
+                      <button className="btn btn-primary btn-sm" onClick={() => setVisibility.mutate('public')}>공개하기</button>
+                      <button className="btn btn-secondary btn-sm" onClick={() => setConfirmingVisibility(false)}>취소</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
