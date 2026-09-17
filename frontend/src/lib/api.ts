@@ -92,6 +92,7 @@ export interface ProjectDetail {
 
 export interface GalleryItem {
   project_id: string;
+  source: 'self' | 'kopis';
   main_title: string;
   genre: string | null;
   primary_date: string | null;
@@ -100,6 +101,7 @@ export interface GalleryItem {
 
 export interface GalleryDetail {
   project_id: string;
+  source: 'self' | 'kopis';
   main_title: string;
   genre: string | null;
   primary_date: string | null;

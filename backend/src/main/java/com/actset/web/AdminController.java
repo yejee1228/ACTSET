@@ -8,6 +8,7 @@ import com.actset.repository.AccountRepository;
 import com.actset.repository.ProjectRepository;
 import com.actset.security.CurrentUser;
 import com.actset.service.AdminService;
+import com.actset.service.PerformanceSeedService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.LinkedHashMap;
@@ -26,12 +27,21 @@ public class AdminController {
     private final AccountRepository accountRepository;
     private final ProjectRepository projectRepository;
     private final AdminService adminService;
+    private final PerformanceSeedService performanceSeedService;
 
     public AdminController(AccountRepository accountRepository, ProjectRepository projectRepository,
-                            AdminService adminService) {
+                            AdminService adminService, PerformanceSeedService performanceSeedService) {
         this.accountRepository = accountRepository;
         this.projectRepository = projectRepository;
         this.adminService = adminService;
+        this.performanceSeedService = performanceSeedService;
+    }
+
+    /** 7-7(MVP 범위 밖) — KOPIS 최신 공연 N건을 Gallery 시드로 적재한다. 관리자 수동 실행. */
+    @PostMapping("/kopis/sync")
+    public Map<String, Object> syncKopis(@RequestParam(defaultValue = "9") int count) throws Exception {
+        int synced = performanceSeedService.syncLatest(count);
+        return Map.of("synced", synced);
     }
 
     @GetMapping("/accounts")
