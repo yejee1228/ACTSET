@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, ApiError, FormatPresetDto } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
@@ -13,6 +13,7 @@ const GROUP_LABELS: Record<string, string> = {
 export default function Step5FormatSelectionPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
   useEffect(() => { trackFunnelStep('step_5_formats'); }, []);
@@ -37,7 +38,10 @@ export default function Step5FormatSelectionPage() {
     mutationFn: () => api.post<{ job_id: string }>(`/projects/${id}/recompose`, {
       format_codes: codes, variants_per_format: 3,
     }),
-    onSuccess: (res) => navigate(`/projects/${id}/recompose-results?job=${res.job_id}`),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      navigate(`/projects/${id}/recompose-results?job=${res.job_id}`);
+    },
     onError: (err) => setSubmitError(err instanceof ApiError ? err.message : '요청에 실패했습니다.'),
   });
 

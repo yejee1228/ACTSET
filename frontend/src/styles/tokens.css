@@ -132,3 +132,15 @@ button { font-family: inherit; }
   max-width: 1200px; margin: 0 auto;
   padding: var(--sp-8) var(--sp-6);
 }
+
+/* 시안 생성 중 로딩 표시(③) — 빈 박스 중앙에 회전 스피너 */
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--orange);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
