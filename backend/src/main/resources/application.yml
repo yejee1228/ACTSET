@@ -43,6 +43,9 @@ actset:
   credit:
     signup-grant: 20
   external:
+    ideogram:
+      api-key: ${IDEOGRAM_API_KEY:}
+      rendering-speed: ${IDEOGRAM_RENDERING_SPEED:DEFAULT}
     openai:
       api-key: ${OPENAI_API_KEY:}
       model: ${OPENAI_MODEL:gpt-4o-mini}

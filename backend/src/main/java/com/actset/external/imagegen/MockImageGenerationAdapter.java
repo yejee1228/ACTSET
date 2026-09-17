@@ -1,5 +1,6 @@
 package com.actset.external.imagegen;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
 import org.springframework.stereotype.Service;
 
 import java.awt.*;
@@ -18,6 +19,7 @@ import javax.imageio.ImageIO;
  * 글자 없는 배경만 만든다는 계약(docs/05)은 목업에서도 지킨다 — 텍스트를 그리지 않는다.
  */
 @Service
+@ConditionalOnExpression("'${actset.external.ideogram.api-key:}'.isEmpty()")
 public class MockImageGenerationAdapter implements ImageGenerationAdapter {
 
     @Override
