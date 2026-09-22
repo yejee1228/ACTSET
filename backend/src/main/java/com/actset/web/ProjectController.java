@@ -56,20 +56,29 @@ public class ProjectController {
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
-    /** 0-B 홈 대시보드(1-6) — active 프로젝트만 노출한다. */
+    /**
+     * 0-B 홈 대시보드(1-6) — 기본은 active 프로젝트만 노출한다. 진행 중인 draft를
+     * 이어서 작성할 수 있도록 status=draft로도 조회 가능하게 열어둔다(크레딧을 써서
+     * 만든 시안이 페이지 이탈만으로 찾을 길이 없어지는 문제 방지).
+     */
     @GetMapping
     public Map<String, Object> list(@RequestParam(required = false) String q,
-                                      @RequestParam(defaultValue = "20") int limit) {
+                                      @RequestParam(defaultValue = "20") int limit,
+                                      @RequestParam(defaultValue = "active") String status) {
+        if (!"active".equals(status) && !"draft".equals(status)) {
+            status = "active";
+        }
         UUID ownerId = CurrentUser.id();
         var pageable = PageRequest.of(0, Math.min(limit, 50), Sort.by(Sort.Direction.DESC, "updatedAt"));
         var page = (q == null || q.isBlank())
-                ? projectRepository.findByOwnerIdAndStatusOrderByUpdatedAtDesc(ownerId, "active", pageable)
+                ? projectRepository.findByOwnerIdAndStatusOrderByUpdatedAtDesc(ownerId, status, pageable)
                 : projectRepository.findByOwnerIdAndStatusAndMainTitleContainingIgnoreCaseOrderByUpdatedAtDesc(
-                        ownerId, "active", q, pageable);
+                        ownerId, status, q, pageable);
 
         List<Map<String, Object>> items = page.getContent().stream().map(p -> {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("id", p.getId().toString());
+            m.put("status", p.getStatus());
             m.put("main_title", p.getMainTitle());
             m.put("genre", p.getGenre());
             m.put("primary_date", p.getPrimaryDate() != null ? p.getPrimaryDate().toString() : null);
@@ -97,6 +106,8 @@ public class ProjectController {
         body.put("genre", project.getGenre());
         body.put("performance_info", project.getPerformanceInfo());
         body.put("design_assets", project.getDesignAssets());
+        body.put("visibility", project.getVisibility());
+        body.put("published_at", project.getPublishedAt() != null ? project.getPublishedAt().toString() : null);
         List<GeneratedAsset> assets = generatedAssetRepository.findByProjectIdAndDeletedAtIsNullOrderByCreatedAtDesc(project.getId());
         long staleInfo = assets.stream().filter(a -> project.getInfoUpdatedAt() != null
                 && (a.getInfoSyncedAt() == null || project.getInfoUpdatedAt().isAfter(a.getInfoSyncedAt()))).count();
@@ -129,6 +140,19 @@ public class ProjectController {
     public record ConfirmRequest(UUID selected_candidate_id) {
     }
 
+    public record VisibilityRequest(String visibility) {
+    }
+
+    /** 7-2 Gallery 공개 전환(Stage 2·4·11·17). active가 아니면 409. */
+    @PostMapping("/{id}/visibility")
+    public Map<String, Object> setVisibility(@PathVariable UUID id, @RequestBody VisibilityRequest req) {
+        Project project = projectService.setVisibility(id, CurrentUser.id(), req.visibility());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("visibility", project.getVisibility());
+        body.put("published_at", project.getPublishedAt() != null ? project.getPublishedAt().toString() : null);
+        return body;
+    }
+
     @PostMapping("/{id}/confirm")
     public Map<String, Object> confirm(@PathVariable UUID id, @RequestBody ConfirmRequest req) {
         ConfirmService.ConfirmResult result = confirmService.confirm(id, CurrentUser.id(), req.selected_candidate_id());
@@ -137,6 +161,17 @@ public class ProjectController {
         body.put("poster_asset_id", result.posterAssetId().toString());
         body.put("confirmed_at", result.confirmedAt().toString());
         return body;
+    }
+
+    /** G-2 "참고해서 만들기"(7-6, Stage 5·17). 참고 대상의 PerformanceInfo는 복사하지 않는다. */
+    @PostMapping("/from-reference/{sourceProjectId}")
+    public ResponseEntity<Map<String, Object>> createFromReference(@PathVariable UUID sourceProjectId) {
+        Project project = projectService.createFromReference(sourceProjectId, CurrentUser.id());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("id", project.getId().toString());
+        body.put("status", project.getStatus());
+        body.put("reference_style_applied", true);
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(body);
     }
 
     /** 0-B 카드 메뉴 → 삭제(4-9). 소프트 삭제, 30일 후 배치가 하드 삭제(4-8, 미착수). */

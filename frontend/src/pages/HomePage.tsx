@@ -26,6 +26,12 @@ export default function HomePage() {
     queryFn: () => api.get<{ items: ProjectListItem[] }>(`/projects${q ? `?q=${encodeURIComponent(q)}` : ''}`),
   });
 
+  // 크레딧을 써서 시안까지 만들고 페이지를 벗어나면 다시 찾을 길이 없어지는 문제 방지(docs/04 0-B 신규).
+  const { data: draftData } = useQuery({
+    queryKey: ['projects', 'draft'],
+    queryFn: () => api.get<{ items: ProjectListItem[] }>('/projects?status=draft'),
+  });
+
   const createProject = useMutation({
     mutationFn: () => api.post<{ id: string }>('/projects'),
     onSuccess: (project) => navigate(`/projects/${project.id}/info`),
@@ -37,6 +43,7 @@ export default function HomePage() {
   });
 
   const items = data?.items ?? [];
+  const draftItems = draftData?.items ?? [];
 
   return (
     <div>
@@ -48,6 +55,27 @@ export default function HomePage() {
             + 새 프로젝트 만들기
           </button>
         </div>
+
+        {draftItems.length > 0 && (
+          <div style={{ marginBottom: 'var(--sp-6)' }}>
+            <h2 className="h2" style={{ marginBottom: 'var(--sp-3)' }}>작성 중인 프로젝트</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--sp-4)' }}>
+              {draftItems.map((p) => (
+                <div key={p.id} className="card" style={{ overflow: 'hidden', position: 'relative', cursor: 'pointer' }}
+                     onClick={() => navigate(`/projects/${p.id}/info`)}>
+                  <span className="badge badge-neutral" style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>작성 중</span>
+                  <div style={{
+                    aspectRatio: '3 / 4', background: p.thumbnail_url ? `url(${p.thumbnail_url}) center/cover` : 'var(--bg-hover)',
+                  }} />
+                  <div style={{ padding: 'var(--sp-3)' }}>
+                    <h3 className="h3" style={{ marginBottom: 'var(--sp-1)' }}>{p.main_title || '(제목 없음)'}</h3>
+                    <p className="body-sm">이어서 작성하기</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         <input
           className="input"

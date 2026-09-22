@@ -44,6 +44,17 @@ export default function Step6RecomposeResultsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['assets', id, '규격변환'] }),
   });
 
+  const [favoriteError, setFavoriteError] = useState<string | null>(null);
+  const toggleFavorite = useMutation({
+    mutationFn: ({ assetId, favorited }: { assetId: string; favorited: boolean }) =>
+      favorited ? api.post(`/assets/${assetId}/favorite`) : api.del(`/assets/${assetId}/favorite`),
+    onSuccess: () => {
+      setFavoriteError(null);
+      queryClient.invalidateQueries({ queryKey: ['assets', id, '규격변환'] });
+    },
+    onError: (err) => setFavoriteError(err instanceof ApiError ? err.message : '요청에 실패했습니다.'),
+  });
+
   const { data: regenJob } = useQuery({
     queryKey: ['job', regenJobId],
     queryFn: () => api.get<JobStatusDetail>(`/jobs/${regenJobId}`),
@@ -70,6 +81,7 @@ export default function Step6RecomposeResultsPage() {
     onSuccess: (res) => {
       setRegenError(null);
       setRegenJobId(res.children[0]?.job_id ?? null);
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
     },
     onError: (err) => setRegenError(err instanceof ApiError ? err.message : '요청에 실패했습니다.'),
   });
@@ -122,6 +134,9 @@ export default function Step6RecomposeResultsPage() {
             {regenError && <span className="body-sm" style={{ color: 'var(--error)' }}>{regenError}</span>}
           </div>
         )}
+        {favoriteError && (
+          <p className="body-sm" style={{ color: 'var(--error)', marginBottom: 'var(--sp-3)' }}>{favoriteError}</p>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-4)' }}>
           {assetsForActive.map((a) => (
@@ -129,6 +144,14 @@ export default function Step6RecomposeResultsPage() {
               {a.status === '선택됨' && (
                 <div style={{ position: 'absolute', top: 8, right: 8, zIndex: 1 }} className="badge badge-success">선택됨</div>
               )}
+              <button
+                className="btn btn-tertiary btn-sm"
+                style={{ position: 'absolute', top: 8, left: 8, zIndex: 1, background: 'var(--surface)' }}
+                onClick={() => toggleFavorite.mutate({ assetId: a.id, favorited: !a.is_favorited })}
+                aria-label="후보함 즐겨찾기"
+              >
+                {a.is_favorited ? '★' : '☆'}
+              </button>
               <img src={a.preview_image_url ?? undefined} alt={a.format_code} style={{ width: '100%', display: 'block' }} />
               <div style={{ padding: 'var(--sp-3)' }}>
                 <button className="btn btn-primary btn-sm" style={{ width: '100%' }}

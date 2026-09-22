@@ -13,12 +13,22 @@
 ## 최상위 구조
 
 ```
-Project (status: draft | active | deleted)
+Project (status: draft | active | deleted, visibility: private | public)
  ├─ PerformanceInfo   (공연정보 — 1:1, 수정 가능한 "현재" 값)
  ├─ DesignAssets       (디자인 자산 — 시안 확정 후 고정되는 톤앤매너)
- ├─ GeneratedAsset[]   (생성 결과물 — 시안후보·포스터·규격변환 등)
+ ├─ GeneratedAsset[]   (생성 결과물 — 시안후보·포스터·규격변환 등, is_favorited로 후보함 표시)
  └─ SelectionEvent[]   (선택 행동 로그)
 ```
+
+### 3대 데이터 자산과의 매핑 (Stage 17 참고)
+
+2026년 9월 사업모델 개편은 위 엔티티를 새로 만들지 않고 **자산 관점에서 재분류**한다. 새 필드는 `visibility`(공개 정책)와 `is_favorited`(후보함)뿐이다.
+
+| 데이터 자산(Stage 17) | 대응 엔티티 |
+|---|---|
+| Performance Data | `PerformanceInfo` |
+| Creative Data | `DesignAssets`(visual_layers·palette 등), `LayoutSample` |
+| User Preference Data | `SelectionEvent`, `GeneratedAsset.is_favorited`(후보함) |
 
 프로젝트 하나 = 공연 하나. PerformanceInfo는 언제든 수정 가능한 단일 레코드이고, GeneratedAsset은 규격·용도별로 하나씩 존재하는 **현재 상태**다(정보가 바뀌면 같은 레코드의 이미지를 교체하며, 버전 이력을 쌓지 않는다 — 아래 "정보 변경 반영 방식" 참고).
 
@@ -29,6 +39,8 @@ Project (status: draft | active | deleted)
 | project_id | string | 프로젝트 ID |
 | owner_id | string | 계정 참조 |
 | status | enum | draft(시안 확정 전) / active(확정 완료) / deleted(소프트 삭제) |
+| visibility | enum(신규) | private(기본값) / public. Gallery 노출 여부(Stage 17). active 상태에서만 public 전환 가능 |
+| published_at | datetime(선택, 신규) | private → public 전환 시각. Gallery 정렬·노출 기준 |
 | created_at | datetime | 생성 시각 |
 | confirmed_at | datetime(선택) | draft → active 전환 시각(④ 시안 확정 시점) |
 | info_updated_at | datetime | PerformanceInfo 최종 수정 시각 — "정보 변경됨" 판정 기준 |
@@ -69,7 +81,8 @@ Project (status: draft | active | deleted)
 | — | reference_images | image[] | 선택 | 참고 이미지 |
 | — | brand_colors | string[](hex) | 선택 | 색상 |
 | — | mandatory_notices | string[] | 선택 | 포스터·홍보물에 반드시 포함되어야 하는 문구(저작권 표기, 특정 후원사 문구, 법적 고지 등). 규격별 정보 생략 대상에서 제외된다 — Stage 5 우선순위 규칙 참고 |
-| — | image_direction_note | string | 선택 | 원하는 이미지 방향에 대한 자유 서술(색감·분위기·구도 등). 필수정보 중 일부를 이 시안에는 넣지 말아달라는 지시도 이 필드에 작성 가능하며, 이 지시는 시스템 기본 규칙보다 우선한다 — Stage 5 우선순위 규칙 참고 |
+| — | image_direction_note | string | 선택 | 원하는 이미지 방향에 대한 자유 서술(색감·분위기·구도 등). 시스템 기본 규칙보다 우선한다 — Stage 5 우선순위 규칙 참고. **제외하고 싶은 요소는 여기가 아니라 image_avoid_note에 쓴다**(아래) |
+| — | image_avoid_note | string | 선택(신규) | 제외하고 싶은 이미지 요소(특정 인물상, 클리셰 등). 긍정 프롬프트에 부정문("~않도록")으로 섞으면 생성 모델이 그 대상에 오히려 반응하는 사례가 있어, 별도 필드로 받아 실제 생성 시 negative_prompt로 분리 전송한다(DraftPromptBuilder) |
 
 ## 하위 객체 스키마
 
@@ -190,6 +203,7 @@ FormatPreset(code, label, width, height, group)
 | base_image_url | string | 생성된 비주얼 원본 위치. **글자가 전혀 없는 순수 비주얼이어야 한다**. 정보만 바뀔 때는 이 파일을 재사용하고 텍스트 레이어만 다시 합성한다 |
 | generation_params | object | 생성에 쓰인 파라미터(프롬프트 방향·팔레트·배치 스타일). SelectionEvent 분석의 핵심 재료(Stage 10) |
 | auto_sync_text | boolean | true면 PerformanceInfo 변경 시 텍스트가 자동 반영됨. 포스터(category=포스터)만 true, 나머지는 false |
+| is_favorited | boolean(신규) | **후보함**. true면 사용자가 무료로 즐겨찾기한 시안후보. 프로젝트당 true인 레코드 최대 **5개**로 서버가 강제(Stage 6·10·11·17). 재생성(유료)과 무관한 무과금 액션 |
 | status | enum | 제안됨 / 선택됨 / 보관 / 삭제됨(소프트 삭제) |
 | created_at | datetime | 생성 시각 |
 | info_synced_at | datetime | 이 결과물의 텍스트가 마지막으로 PerformanceInfo와 동기화된 시각 |
@@ -293,6 +307,12 @@ Stage 5의 학습 파이프라인이 포스터 1건을 분석해 만들어내는
 ```
 
 수집 포스터의 저작권 처리는 별도 검토가 필요하다. 원본 이미지를 보관하지 않고 **분석 결과인 LayoutSample만 저장**하는 방식이면 위험을 낮출 수 있으나, 법률 자문으로 확인해야 한다(Stage 15 참고).
+
+## Gallery 확장 훅 (신규, 스키마 변경 없음 — 확인필요)
+
+MVP는 별도의 Gallery 전용 테이블을 만들지 않는다. `Project`(visibility·published_at)와 `GeneratedAsset`(대표 포스터)만으로 최소 목록·상세를 구성한다(Stage 17 최소 Gallery 범위 참고).
+
+**KOPIS(공공데이터포털 공연정보) 연동은 MVP 이후 과제이므로 지금 테이블을 만들지 않는다.** 다만 향후 별도 소스(`source=kopis`)의 공연정보를 Gallery에 함께 노출하려면 `Project`와 유사하지만 `owner_id`가 없는 별도 엔티티(가칭 `performance_seed`)가 필요할 가능성이 높다는 점만 여기 기록해 둔다. 실제 스키마는 KOPIS 연동 착수 시점에 API 응답 구조를 보고 확정한다(Stage 14 참고, **확인필요**).
 
 ## PrintOrderDraft 필드 정의 (⑧ 인쇄 페이지 — MVP는 초안까지만 지원)
 

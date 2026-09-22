@@ -20,6 +20,6 @@ public class AuthDtos {
     public record LoginRequest(@NotBlank String email, @NotBlank String password) {
     }
 
-    public record AccountResponse(String id, String email, String role, int credit_balance) {
+    public record AccountResponse(String id, String email, String role, int credit_balance, String plan) {
     }
 }

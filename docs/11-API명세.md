@@ -29,10 +29,10 @@
   "agreements": { "terms": true, "privacy": true, "marketing": false },
   "terms_version": "2026-09-01" }
 // 201
-{ "id": "uuid", "email": "...", "credit_balance": 300 }
+{ "id": "uuid", "email": "...", "credit_balance": "SIGNUP_GRANT_CREDITS" }
 ```
 
-가입 시 초기 크레딧을 지급하고 `credit_transactions`에 `type='signup_grant'`로 기록한다(Stage 6).
+가입 시 초기 크레딧을 지급하고 `credit_transactions`에 `type='signup_grant'`로 기록한다(Stage 6). 지급량은 하드코딩 예시 숫자 대신 명명된 상수로 관리한다 — 일반 가입은 `SIGNUP_GRANT_CREDITS`(20C), 베타 참여자는 `BETA_SIGNUP_GRANT_CREDITS`(50C)이며 실제 응답에는 해당 상수의 값이 숫자로 담긴다(Stage 6·17 — 상수명 자체가 값 변경 시 이 문서를 매번 고치지 않아도 되게 한다).
 
 ### `POST /auth/login` · `POST /auth/logout`
 세션 발급·파기. 로그인 실패는 계정 존재 여부를 노출하지 않도록 동일한 `401`로 응답한다.
@@ -41,8 +41,10 @@
 현재 로그인 계정. 미인증이면 `401`.
 
 ```json
-{ "id": "uuid", "email": "...", "role": "user", "credit_balance": 1200 }
+{ "id": "uuid", "email": "...", "role": "user", "credit_balance": 1200, "plan": "free" }
 ```
+
+`plan`은 구독(Subscription) 도입을 위한 스키마 훅이며 MVP는 항상 `"free"`를 반환한다(Stage 6·10·17).
 
 ### `POST /auth/password-reset/request` · `POST /auth/password-reset/confirm`
 재설정 메일 발송 → 토큰으로 확정. **토큰은 1회용·만료형**이며, 요청 엔드포인트는 계정 존재 여부와 무관하게 항상 `202`를 반환한다(계정 존재 확인 수단이 되지 않게 한다).
@@ -81,12 +83,14 @@
 ```
 
 ### `GET /projects`
-홈 대시보드 목록. `status='active'`만 반환한다.
+홈 대시보드 목록. 기본은 `status='active'`만 반환한다.
 
-`?q=검색어&sort=updated_at&cursor=...&limit=20`
+`?q=검색어&sort=updated_at&cursor=...&limit=20&status=active`
+
+`status`는 `active`(기본) | `draft`. **draft로 조회하면 아직 시안도 확정 안 한 진행 중인 프로젝트를 이어서 작성할 수 있다** — 크레딧을 써서 시안까지 만들어 놓고 페이지를 벗어나면 그 프로젝트를 다시 찾을 길이 없어지는 문제를 막기 위함이다(홈 대시보드의 "작성 중인 프로젝트" 섹션이 이 조회를 쓴다).
 
 ```json
-{ "items": [ { "id": "uuid", "main_title": "겨울 나그네", "genre": "클래식",
+{ "items": [ { "id": "uuid", "status": "active", "main_title": "겨울 나그네", "genre": "클래식",
                "primary_date": "2026-03-14", "date_undetermined": false,
                "thumbnail_url": "...", "updated_at": "..." } ],
   "next_cursor": null }
@@ -178,14 +182,73 @@ kind: performance_photo | cast_photo | logo | reference_image
 
 ---
 
+## 1-3. Gallery (DISCOVER 최소 구현, 신규 — Stage 17)
+
+### `POST /projects/{id}/visibility`
+프로젝트 공개·비공개 전환(⑦ 대시보드 토글). `status='active'`가 아니면 `409`.
+
+```json
+// 요청 { "visibility": "public" }
+// 200 { "visibility": "public", "published_at": "..." }
+```
+
+### `GET /gallery`
+최소 목록(G-1). 인증 불필요 — 공개 콘텐츠다.
+
+`?genre=클래식&cursor=...&limit=20`
+
+```json
+{ "items": [ { "project_id": "uuid", "main_title": "겨울 나그네", "genre": "클래식",
+               "primary_date": "2026-03-14", "thumbnail_url": "..." } ],
+  "next_cursor": null }
+```
+
+`visibility='public' AND status='active'`인 프로젝트만 반환한다(Stage 10 `idx_projects_gallery` 참고). MVP는 KOPIS 시드 데이터를 포함하지 않는다(Stage 17).
+
+### `GET /gallery/{project_id}`
+최소 상세(G-2). 인증 불필요.
+
+```json
+{ "project_id": "uuid", "main_title": "...", "genre": "...",
+  "primary_date": "...", "venue_name": "...",
+  "poster_preview_url": "..." }
+```
+
+공연정보 중 어디까지 노출할지는 확인필요다(Stage 4·15 참고) — 출연진·가격 등 민감할 수 있는 필드는 MVP 응답에서 제외한다.
+
+### `POST /projects/from-reference/{project_id}`
+"참고해서 내 포스터 만들기". 참고 대상의 스타일 속성만 추출해 새 draft 프로젝트 생성에 반영한다(Stage 5 4-2 참고).
+
+```json
+// 202
+{ "id": "새 uuid(draft)", "status": "draft",
+  "reference_style_applied": true }
+```
+
+참고 대상의 `PerformanceInfo`는 복사하지 않는다. 새 프로젝트는 일반 ① 화면 진입과 동일하게 사용자가 자신의 공연정보를 입력하며, `generation_params`에 참고 스타일 힌트가 포함된 채로 ③ 시안 생성이 이루어진다.
+
+### `POST /assets/{id}/favorite` · `DELETE /assets/{id}/favorite`
+후보함 즐겨찾기 추가·해제. 무과금.
+
+```json
+// POST 응답
+// 200 { "is_favorited": true, "favorited_count": 3 }
+// 409 (5개 초과 시)
+{ "error": { "code": "FAVORITE_LIMIT_EXCEEDED",
+             "message": "후보함은 최대 5개까지 담을 수 있습니다.",
+             "details": { "limit": 5 } } }
+```
+
+---
+
 ## 2. 시안·홍보물 생성
 
 ### `POST /projects/{id}/drafts`
-③ 시안 후보 생성. 재생성·다른 방향 보기도 같은 엔드포인트를 쓴다.
+③ 시안 후보 생성. 재생성·이 방향으로 더 보기도 같은 엔드포인트를 쓴다.
 
 ```json
 // 요청
-{ "mode": "initial",          // initial | regenerate | new_direction | more_like
+{ "mode": "initial",          // initial | regenerate | more_like
   "count": 3,
   "reference_candidate_id": "uuid"   // more_like일 때만
 }
@@ -193,6 +256,10 @@ kind: performance_photo | cast_photo | logo | reference_image
 // 202
 { "job_id": "uuid" }
 ```
+
+원래는 `regenerate`(같은 방향 유지)와 `new_direction`(다른 스타일)이 분리돼 있었으나, 화면에서 둘의 차이가 구분되지 않는다는 피드백을 받아 **하나의 "재생성" 버튼으로 통합**했다 — `mode` 값 자체도 `new_direction`을 없애고 `regenerate` 하나로 합쳤다(과거 이력 호환을 위해 DB의 `selection_events.action` CHECK 제약에는 `view_more_direction` 값이 계속 남아있다).
+
+`mode`는 크레딧 단가뿐 아니라 실제 생성 방식도 바꾼다 — `initial`은 스타일 무작위 지정 없이(벤더 기본값), `regenerate`는 Ideogram `style_type`을 매 호출 무작위로 바꿔 실제로 다른 스타일을 받는다(=예전 new_direction의 동작을 재생성이 그대로 흡수). `more_like`는 `reference_candidate_id`가 가리키는 후보의 seed·style_type을 그대로 재사용해 "비슷한 후보"에 최대한 가깝게 근사한다(벤더에 별도 리믹스 API가 없어 완전히 같은 이미지가 나올 수도 있음 — 확인필요).
 
 ### `POST /projects/{id}/recompose`
 ⑤→⑥ 규격 일괄변환. 포스터를 포함하면 원본 재생성으로 처리된다.
@@ -209,7 +276,7 @@ kind: performance_photo | cast_photo | logo | reference_image
   "children": [ { "job_id": "uuid", "format_code": "SNS_1X1" }, ... ] }
 ```
 
-규격별 하위 작업으로 나뉘므로 일부가 실패해도 나머지는 살아남는다. `format_codes`에 `POSTER`가 포함되면 새 레코드를 만들지 않고 기존 포스터를 교체하며, DesignAssets가 갱신되어 다른 결과물이 `stale_design` 상태가 된다. `mode`에 따라 크레딧 단가가 다르다(Stage 6 — `initial` 2C, `regenerate` 1C, 규격당).
+규격별 하위 작업으로 나뉘므로 일부가 실패해도 나머지는 살아남는다. `format_codes`에 `POSTER`가 포함되면 새 레코드를 만들지 않고 기존 포스터를 교체하며, DesignAssets가 갱신되어 다른 결과물이 `stale_design` 상태가 된다. `mode`에 따라 크레딧 단가가 다르다(Stage 6 — `initial` 2C, `regenerate` 1C, 규격당. 3-5b).
 
 ### `POST /projects/{id}/resync`
 ⑦ "최신 반영". 정보·원본이 어긋난 결과물을 다시 렌더링한다.
@@ -257,8 +324,12 @@ kind: performance_photo | cast_photo | logo | reference_image
                "downloadable": true,
                "download_expires_at": "2026-06-12T00:00:00Z",
                "status": "선택됨",
+               "prompt": "클래식 공연의 포스터 배경 키비주얼. ...",
+               "negative_prompt": "text, letters, words, ..., 특정 인물상",
                "stale": { "info": true, "design": false } } ] }
 ```
+
+`prompt`·`negative_prompt`는 실제로 이미지 생성 벤더에 전송된 텍스트 그대로다(목업 모드에서는 비어 있음) — 결과물이 의도와 다르게 나왔을 때 원인을 확인하는 용도다(Stage 5).
 
 - `preview_image_url`은 화면 표시용 축소본이며 **항상 존재한다**
 - `image_url`은 원본이며, 대용량 파일이 90일을 넘기면 `null`이 되고 `downloadable=false`가 된다. 이 경우 화면은 미리보기를 그대로 보여주되 다운로드 버튼을 비활성화한다
@@ -423,6 +494,10 @@ kind: performance_photo | cast_photo | logo | reference_image
 | ⑦ 대시보드 | `GET /projects/{id}` · `GET /projects/{id}/assets` · `POST .../resync` |
 | 6-1 정보 수정 | `PATCH /projects/{id}/info` (명시적 저장) |
 | ⑧ 인쇄 | `POST /projects/{id}/print-renders` → `GET /jobs/{id}` · `POST /projects/{id}/print-drafts` |
+| G-1 Gallery 목록(신규) | `GET /gallery` |
+| G-2 Gallery 상세(신규) | `GET /gallery/{project_id}` → `POST /projects/from-reference/{project_id}` |
+| ⑦ 대시보드 — Gallery 공개 전환(신규) | `POST /projects/{id}/visibility` |
+| ③·⑥ 후보함(신규) | `POST /assets/{id}/favorite` · `DELETE /assets/{id}/favorite` |
 
 ## 다음 단계
 

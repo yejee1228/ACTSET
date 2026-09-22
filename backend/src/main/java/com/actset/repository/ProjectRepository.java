@@ -20,4 +20,16 @@ public interface ProjectRepository extends JpaRepository<Project, UUID> {
 
     Page<Project> findByOwnerIdAndStatusAndMainTitleContainingIgnoreCaseOrderByUpdatedAtDesc(
             UUID ownerId, String status, String q, Pageable pageable);
+
+    /**
+     * Gallery(G-1·G-2, Stage 17)는 인증 없이 열람 가능한 공개 콘텐츠라 owner_id로 좁힐 수 없다.
+     * 대신 visibility·status 조건으로 "공개·확정 프로젝트만"을 강제해 docs/09 권한 원칙의 취지
+     * (id 하나만으로 무제한 조회하지 않는다)를 지킨다.
+     */
+    Page<Project> findByVisibilityAndStatusOrderByPublishedAtDesc(String visibility, String status, Pageable pageable);
+
+    Page<Project> findByVisibilityAndStatusAndGenreOrderByPublishedAtDesc(
+            String visibility, String status, String genre, Pageable pageable);
+
+    Optional<Project> findByIdAndVisibilityAndStatus(UUID id, String visibility, String status);
 }

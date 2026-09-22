@@ -39,7 +39,12 @@ public class AuthController {
     private final MailSender mailSender;
     private final PasswordResetService passwordResetService;
 
-    @Value("${actset.credit.signup-grant:50}")
+    /**
+     * SIGNUP_GRANT_CREDITS(Stage 6·17). 베타 참여자(BETA_SIGNUP_GRANT_CREDITS=50C)는 별도 가입
+     * 경로 없이, 이 일반 지급 위에 관리자가 POST /admin/accounts/{id}/credits로 추가 지급한다
+     * — 자기신고형 "베타 여부" 플래그를 가입 화면에 두면 어뷰징 통로가 되기 때문이다.
+     */
+    @Value("${actset.credit.signup-grant:20}")
     private int signupGrant;
 
     public AuthController(AccountRepository accountRepository, PasswordEncoder passwordEncoder,
@@ -92,7 +97,7 @@ public class AuthController {
         authenticateAndBindSession(req.email(), req.password(), request, response);
 
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(new AccountResponse(account.getId().toString(), account.getEmail(), account.getRole(), account.getCreditBalance()));
+                .body(new AccountResponse(account.getId().toString(), account.getEmail(), account.getRole(), account.getCreditBalance(), account.getPlan()));
     }
 
     @PostMapping("/login")
@@ -109,13 +114,13 @@ public class AuthController {
         Account account = principal.getAccount();
         account.setLastLoginAt(Instant.now());
         accountRepository.save(account);
-        return ResponseEntity.ok(new AccountResponse(account.getId().toString(), account.getEmail(), account.getRole(), account.getCreditBalance()));
+        return ResponseEntity.ok(new AccountResponse(account.getId().toString(), account.getEmail(), account.getRole(), account.getCreditBalance(), account.getPlan()));
     }
 
     @GetMapping("/me")
     public AccountResponse me() {
         Account account = accountRepository.findById(CurrentUser.id()).orElseThrow(ApiException::notFound);
-        return new AccountResponse(account.getId().toString(), account.getEmail(), account.getRole(), account.getCreditBalance());
+        return new AccountResponse(account.getId().toString(), account.getEmail(), account.getRole(), account.getCreditBalance(), account.getPlan());
     }
 
     public record PasswordResetRequest(String email) {

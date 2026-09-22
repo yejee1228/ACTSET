@@ -27,7 +27,9 @@ public class DraftController {
     public ResponseEntity<Map<String, String>> requestDrafts(@PathVariable UUID id, @RequestBody(required = false) DraftRequest req) {
         String mode = (req != null && req.mode() != null) ? req.mode() : "initial";
         int count = (req != null && req.count() != null) ? req.count() : 3;
-        UUID jobId = draftService.requestDrafts(id, CurrentUser.id(), mode, count);
+        UUID referenceCandidateId = (req != null && req.reference_candidate_id() != null)
+                ? UUID.fromString(req.reference_candidate_id()) : null;
+        UUID jobId = draftService.requestDrafts(id, CurrentUser.id(), mode, count, referenceCandidateId);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(Map.of("job_id", jobId.toString()));
     }
 }

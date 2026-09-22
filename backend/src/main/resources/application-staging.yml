@@ -2,7 +2,3 @@
 logging:
   level:
     com.actset: INFO
-
-actset:
-  external:
-    mock-mode: ${EXTERNAL_MOCK_MODE:true}

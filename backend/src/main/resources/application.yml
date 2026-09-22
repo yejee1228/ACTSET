@@ -41,6 +41,13 @@ actset:
   storage:
     root: ${STORAGE_ROOT:../storage}
   credit:
-    signup-grant: 50
+    signup-grant: 20
   external:
-    mock-mode: true
+    ideogram:
+      api-key: ${IDEOGRAM_API_KEY:}
+      rendering-speed: ${IDEOGRAM_RENDERING_SPEED:DEFAULT}
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      model: ${OPENAI_MODEL:gpt-4o-mini}
+    kopis:
+      service-key: ${KOPIS_SERVICE_KEY:}

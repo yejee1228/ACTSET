@@ -10,8 +10,6 @@ management:
     health:
       show-details: never
 
-actset:
-  external:
-    # 실제 벤더 키가 준비되기 전까지는 운영에서도 목업을 쓴다 — 진짜 과금이 발생하는
-    # 어댑터로 교체하는 시점에 이 값을 false로 내리고 벤더별 키를 환경변수로 추가한다.
-    mock-mode: ${EXTERNAL_MOCK_MODE:true}
+# 벤더 키(IDEOGRAM_API_KEY·OPENAI_API_KEY·KOPIS_SERVICE_KEY)는 application.yml의
+# 기본값을 통해 환경변수로만 주입된다 — 여기서 중복 선언하지 않는다. 비워두면
+# 해당 벤더만 자동으로 목업으로 동작한다(벤더별 독립, docs/14).
