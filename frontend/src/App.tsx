@@ -22,6 +22,7 @@ import AdminPage from './pages/AdminPage';
 import GalleryListPage from './pages/GalleryListPage';
 import GalleryDetailPage from './pages/GalleryDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ConvertPage from './pages/ConvertPage';
 import { RequireAuth } from './components/RequireAuth';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -44,6 +45,7 @@ export default function App() {
         <Route path="/credits" element={<RequireAuth><CreditsPage /></RequireAuth>} />
         <Route path="/support" element={<RequireAuth><SupportPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
+        <Route path="/convert" element={<RequireAuth><ConvertPage /></RequireAuth>} />
 
         <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
         <Route path="/projects/:id/additional" element={<RequireAuth><Step2AdditionalInfoPage /></RequireAuth>} />

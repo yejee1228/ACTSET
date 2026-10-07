@@ -395,6 +395,21 @@ kind: performance_photo | cast_photo | logo | reference_image
 
 커스텀 규격이 열리면 이 목록에 없는 치수를 `recompose` 요청에 직접 담는다(`{"format_code":"CUSTOM","width":1200,"height":400}`). 규칙은 `ratio_bucket`으로 찾아 적용한다(Stage 12).
 
+### `GET /format-classes` · `POST /conversions` — 포스터 업로드형 규격변환 (2026-10-07 추가)
+
+고객이 가진 포스터 한 장을 MVP 5분류(긴 세로·세로·정사각·가로·긴 가로, docs/12) 규격으로 바꾼다. 화면: `/convert`.
+
+`GET /format-classes` → `{ "items": [{ "code": "PORTRAIT", "label": "세로", "width": 1080, "height": 1920, "example": "SNS 스토리" }, ...], "cost_per_format": 2 }`
+
+`POST /conversions` (multipart) — `poster`(JPG·PNG, 20MB 이하, 짧은 변 300px 이상), `format_classes`(여러 번)
+
+```jsonc
+// 202
+{ "project_id": "uuid", "job_id": "uuid", "credit_cost": 4, "format_classes": ["PORTRAIT", "LANDSCAPE"] }
+```
+
+새 프로젝트를 만들고 `format_convert` 작업 1건을 등록하며, 같은 트랜잭션에서 규격당 2C를 차감한다(실패 시 job 단위 환불). 진행은 `GET /jobs/{id}`, 결과는 `GET /projects/{id}/assets?category=규격변환`. **포스터가 외부 AI(분해·배경 검증·재생성)로 전송된다** — 화면에 고지한다(docs/15 결정 필요, FORMAT-CONVERSION-REPORT.md).
+
 ### `POST /projects/{id}/print-renders`
 ⑧에서 지정한 인쇄 크기(mm)·dpi로 레이어 스택을 재합성한다(5-3). 비주얼 레이어는 업스케일, 텍스트는 재렌더링, **PHOTO는 업로드 원본을 직접 재배치**한다(외부 업스케일러에 보내지 않는다 — Stage 5).
 
