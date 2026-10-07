@@ -60,6 +60,7 @@ public class GptVisionAnalysisAdapter implements VisionAnalysisAdapter {
             - COPY: tagline / subtitle / short promotional phrases near the title (including small English words)
             - INFO: date, time, venue, organizer, age, price, contact lines
             - MARK: company/organizer logo
+            - FRAME: border/frame lines or ornamental corners running along the canvas edges
             - NOISE: fragments, dust, duplicated partial copies, unusable pieces
             Also list text that is visible in the original poster but is NOT contained (fully readable) in any
             element — so we can typeset it again. Give its bbox relative to the original poster (0..1).

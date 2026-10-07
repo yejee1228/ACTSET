@@ -55,6 +55,7 @@ public final class LayoutPlanner {
                 case INFO -> add(members, LayoutBlock.INFO, e);
                 case MARK -> add(members, LayoutBlock.MARK, e);
                 case NOISE -> dropped.add(e.id() + "(NOISE)");
+                case FRAME -> dropped.add(e.id() + "(FRAME — 테두리는 비율에 맞춰 다시 그려야 해서 MVP는 생략)");
                 case DECOR -> {
                     // 아래에서 블록이 정해진 뒤 붙인다
                 }

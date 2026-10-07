@@ -223,6 +223,11 @@ public final class ElementSplitter {
         return out;
     }
 
+    /** 8방향 연결요소 라벨링(외부 공개용). 0은 배경. */
+    public static int[] label8(boolean[] mask, int w, int h) {
+        return connectedComponents(mask, w, h);
+    }
+
     /** 8방향 연결요소 라벨링. 0은 배경. */
     static int[] connectedComponents(boolean[] mask, int w, int h) {
         int n = w * h;

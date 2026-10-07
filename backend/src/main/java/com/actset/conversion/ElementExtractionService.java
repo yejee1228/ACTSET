@@ -47,9 +47,11 @@ public class ElementExtractionService {
     /** 임시값 — 불투명 90% 이상이면서 색 편차가 이보다 작으면 단색판(Qwen이 내놓는 검정판)으로 버린다. */
     static final double UNIFORM_STDDEV = 6.0;
     /** 임시값 — 배경 차이 추출: 이 거리 아래는 같은 배경, 위쪽 값 이상이면 확실한 잔여 요소(그 사이는 반투명). */
-    static final int RESIDUAL_DIFF_LOW = 28, RESIDUAL_DIFF_HIGH = 72;
+    static final int RESIDUAL_DIFF_LOW = 60, RESIDUAL_DIFF_HIGH = 110, RESIDUAL_DIFF_CORE = 170;
     /** 임시값 — 배경 잔여물 bbox 합이 캔버스의 이 비율 미만이면 재생성하지 않고 자체 엔진으로 메운다(4차 실행: 0.04% 얼룩에 재생성 1회). */
     static final double SMALL_RESIDUAL_AREA = 0.02;
+    /** 임시값 — 잔여물 하나의 bbox가 캔버스의 이 비율을 넘으면 차이 추출을 하지 않는다. */
+    static final double MAX_RESIDUAL_AREA = 0.30;
     /** 역할 판정 시트에 올리는 최대 요소 수. 나머지(작은 조각)는 NOISE로 둔다. */
     static final int MAX_CLASSIFY = 48;
 
@@ -170,7 +172,8 @@ public class ElementExtractionService {
         String backdropOrigin;
         double residualArea = check.residualElements().stream().filter(r -> r.bbox() != null)
                 .mapToDouble(r -> Math.max(0, r.bbox()[2] - r.bbox()[0]) * Math.max(0, r.bbox()[3] - r.bbox()[1])).sum();
-        boolean anyHole = check.residualElements().stream().anyMatch(Residual::isHole) || holes >= 0.01;
+        // 구멍 여부는 자체 측정(투명 픽셀 비율)으로만 본다 — LLM은 작은 얼룩도 is_hole로 표시해 불필요한 재생성을 부른다(8차 실행)
+        boolean anyHole = holes >= 0.01;
         checkLog.put("residual_area_ratio", round(residualArea));
         if (check.clean() || check.editInstruction().isBlank()) {
             backdrop = filled;
@@ -193,7 +196,8 @@ public class ElementExtractionService {
             // 다른 레이어가 이미 가진 픽셀(제목·달 등)은 잔여 요소에서 뺀다 — 같은 요소가 두 번 쌓이는 잔상 방지
             float[] covered = new float[w * h];
             for (int i = 0; i < restored.size(); i++) {
-                if (i == backdropIdx) continue;
+                // 배경 자신과 단색이라 버린 판(Qwen 검정판)은 빼야 한다 — 5차 실행에서 검정판을 세어 잔여 요소가 0개가 됐다
+                if (i == backdropIdx || layerLog.get(i).path("uniform_discarded").asBoolean()) continue;
                 int[] px = restored.get(i).getRGB(0, 0, w, h, null, 0, w);
                 for (int p = 0; p < px.length; p++) covered[p] = Math.max(covered[p], (px[p] >>> 24) / 255f);
             }
@@ -275,24 +279,24 @@ public class ElementExtractionService {
         ArrayNode used = log.putArray("residual_regions");
         for (Residual r : residuals) {
             if (r.isHole() || r.bbox() == null) continue;
+            double area = (r.bbox()[2] - r.bbox()[0]) * (r.bbox()[3] - r.bbox()[1]);
+            if (area > MAX_RESIDUAL_AREA) {
+                // 화면 대부분을 덮는 잔여물(예: 화면을 가로지르는 금빛 궤적)은 재생성 배경과의 차이에 구름 모양 차이까지
+                // 섞여 들어와 떼어낼 수 없다 — 이 요소는 결과물에서 사라진다(리포트에 기록)
+                used.addObject().put("name", r.name()).put("skipped", "영역이 캔버스의 " + Math.round(area * 100) + "% — 차이 추출 불가, 요소 소실");
+                continue;
+            }
             int pad = (int) (0.03 * Math.max(w, h));
             int x0 = clampInt((int) (r.bbox()[0] * w) - pad, 0, w), y0 = clampInt((int) (r.bbox()[1] * h) - pad, 0, h);
             int x1 = clampInt((int) (r.bbox()[2] * w) + pad, 0, w), y1 = clampInt((int) (r.bbox()[3] * h) + pad, 0, h);
             if (x1 - x0 < 4 || y1 - y0 < 4) continue;
-            // 테두리 띠(바깥 pad 폭)의 평균 차이 = 색감 오프셋
+            // 테두리 띠(바깥 pad 폭)의 차이 중앙값 = 색감 오프셋. 평균을 쓰면 띠에 걸친 다른 요소(초승달 옆 매달린 별의 띠가
+            // 달과 겹침)에 끌려 오프셋이 틀어지고, 그 영역 전체가 직사각형째 떨어진다(6차 실행)
             int ring = Math.max(4, pad);
-            long[] sum = new long[3];
-            long n = 0;
-            for (int y = Math.max(0, y0 - ring); y < Math.min(h, y1 + ring); y++) {
-                for (int x = Math.max(0, x0 - ring); x < Math.min(w, x1 + ring); x++) {
-                    if (x >= x0 && x < x1 && y >= y0 && y < y1) continue;
-                    int i = y * w + x;
-                    for (int c = 0; c < 3; c++) sum[c] += ((b[i] >> (16 - 8 * c)) & 0xff) - ((a[i] >> (16 - 8 * c)) & 0xff);
-                    n++;
-                }
-            }
-            int[] off = new int[3];
-            for (int c = 0; c < 3; c++) off[c] = n == 0 ? 0 : (int) (sum[c] / n);
+            int[] off = medianRingOffset(a, b, w, h, x0, y0, x1, y1, ring);
+            int rw = x1 - x0, rh = y1 - y0;
+            int[] regionAlpha = new int[rw * rh];
+            boolean[] core = new boolean[rw * rh];
             for (int y = y0; y < y1; y++) {
                 for (int x = x0; x < x1; x++) {
                     int i = y * w + x;
@@ -303,17 +307,67 @@ public class ElementExtractionService {
                         d2 += dc * dc;
                     }
                     double d = Math.sqrt(d2);
-                    int alpha = (int) Math.round(255 * (1 - coveredByOtherLayers[i]) * Math.max(0, Math.min(1,
-                            (d - RESIDUAL_DIFF_LOW) / (double) (RESIDUAL_DIFF_HIGH - RESIDUAL_DIFF_LOW))));
+                    double diffAlpha = Math.max(0, Math.min(1,
+                            (d - RESIDUAL_DIFF_LOW) / (double) (RESIDUAL_DIFF_HIGH - RESIDUAL_DIFF_LOW)));
+                    int k = (y - y0) * rw + (x - x0);
+                    regionAlpha[k] = (int) Math.round(255 * (1 - coveredByOtherLayers[i]) * diffAlpha);
+                    core[k] = d > RESIDUAL_DIFF_CORE && regionAlpha[k] > 0;
+                }
+            }
+            // 히스테리시스: 차이가 아주 큰 핵(core) 픽셀을 포함한 덩어리만 남긴다 — 재생성으로 모양이 조금 바뀐 구름·별은
+            // 차이가 중간 정도라 핵이 없다(로컬 실험: poc/out/format-conversion/_lab)
+            int kept = keepComponentsWithCore(regionAlpha, core, rw, rh);
+            for (int y = y0; y < y1; y++) {
+                for (int x = x0; x < x1; x++) {
+                    int i = y * w + x, alpha = regionAlpha[(y - y0) * rw + (x - x0)];
                     if (alpha > (out[i] >>> 24)) out[i] = (alpha << 24) | (rawPx[i] & 0xffffff);
                 }
             }
             used.addObject().put("name", r.name()).put("rect", x0 + "," + y0 + "-" + x1 + "," + y1)
-                    .put("tone_offset", off[0] + "," + off[1] + "," + off[2]);
+                    .put("tone_offset", off[0] + "," + off[1] + "," + off[2]).put("kept_px", kept);
         }
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         img.setRGB(0, 0, w, h, out, 0, w);
         return img;
+    }
+
+    /** 사각형 바깥 ring 폭 띠에서 (b - a)의 채널별 중앙값. */
+    static int[] medianRingOffset(int[] a, int[] b, int w, int h, int x0, int y0, int x1, int y1, int ring) {
+        int[][] hist = new int[3][511];
+        int n = 0;
+        for (int y = Math.max(0, y0 - ring); y < Math.min(h, y1 + ring); y++) {
+            for (int x = Math.max(0, x0 - ring); x < Math.min(w, x1 + ring); x++) {
+                if (x >= x0 && x < x1 && y >= y0 && y < y1) continue;
+                int i = y * w + x;
+                for (int c = 0; c < 3; c++) hist[c][((b[i] >> (16 - 8 * c)) & 0xff) - ((a[i] >> (16 - 8 * c)) & 0xff) + 255]++;
+                n++;
+            }
+        }
+        int[] off = new int[3];
+        for (int c = 0; c < 3 && n > 0; c++) {
+            int acc = 0, v = 0;
+            while (acc + hist[c][v] <= n / 2) acc += hist[c][v++];
+            off[c] = v - 255;
+        }
+        return off;
+    }
+
+    /** alpha>0 연결요소(8방향) 중 core 픽셀이 하나도 없는 덩어리를 지운다. 남긴 픽셀 수를 돌려준다. */
+    static int keepComponentsWithCore(int[] alpha, boolean[] core, int w, int h) {
+        boolean[] mask = new boolean[alpha.length];
+        for (int i = 0; i < alpha.length; i++) mask[i] = alpha[i] > 0;
+        int[] labels = com.actset.conversion.engine.ElementSplitter.label8(mask, w, h);
+        int max = 0;
+        for (int l : labels) max = Math.max(max, l);
+        boolean[] hasCore = new boolean[max + 1];
+        for (int i = 0; i < alpha.length; i++) if (core[i]) hasCore[labels[i]] = true;
+        int kept = 0;
+        for (int i = 0; i < alpha.length; i++) {
+            if (labels[i] == 0) continue;
+            if (hasCore[labels[i]]) kept++;
+            else alpha[i] = 0;
+        }
+        return kept;
     }
 
     /** 잔여물 bbox(약간 넓혀서)를 투명하게 뚫는다 — fillHoles가 주변 색으로 메운다. */

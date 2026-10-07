@@ -262,7 +262,7 @@ public class ConversionTestRunner implements ApplicationRunner {
         boolean stack = c == FormatClass.LONG_LANDSCAPE || c == FormatClass.LANDSCAPE;
         int label = 36;
         List<BufferedImage> imgs = List.of(a, b, ref);
-        List<String> names = List.of("A: 임시 사전값 규칙(본 결과)", "B: 기준 이미지로 학습한 규칙(누설 — 참고용)", "기준 이미지(사용자 제작)");
+        List<String> names = List.of("A 임시 사전값(본 결과)", "B 기준 학습(누설·참고)", "기준(사용자 제작)");
         int unit = stack ? 1600 : 900;
         List<BufferedImage> scaled = new ArrayList<>();
         for (BufferedImage img : imgs) {
