@@ -94,7 +94,10 @@ public class ProjectController {
             m.put("date_undetermined", p.isDateUndetermined());
             Optional<GeneratedAsset> poster = generatedAssetRepository
                     .findFirstByProjectIdAndCategoryAndDeletedAtIsNull(p.getId(), "포스터");
-            m.put("thumbnail_url", poster.map(a -> generatedAssetService.toSignedUrl(a.getPreviewImageUrl())).orElse(null));
+            // 대표 포스터가 없으면 업로드 원본으로(방어 — 없앤 /convert 경로로 만든 프로젝트처럼 결과물이 빠진 경우)
+            String fallback = p.getDesignAssets() != null ? p.getDesignAssets().path("source_poster").asText(null) : null;
+            m.put("thumbnail_url", poster.map(a -> generatedAssetService.toSignedUrl(a.getPreviewImageUrl()))
+                    .orElse(fallback != null ? generatedAssetService.toSignedUrl(fallback) : null));
             m.put("updated_at", p.getUpdatedAt().toString());
             m.put("source", p.getDesignAssets() != null ? p.getDesignAssets().path("source").asText(null) : null);
             return m;

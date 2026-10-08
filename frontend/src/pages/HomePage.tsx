@@ -63,6 +63,20 @@ export default function HomePage() {
                 <div key={p.id} className="card" style={{ overflow: 'hidden', position: 'relative', cursor: 'pointer' }}
                      onClick={() => navigate(p.source === 'uploaded_poster' ? `/projects/${p.id}/upload-poster` : `/projects/${p.id}/info`)}>
                   <span className="badge badge-neutral" style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>작성 중</span>
+                  <button
+                    className="btn btn-destructive btn-sm"
+                    style={{ position: 'absolute', top: 6, right: 6, zIndex: 1 }}
+                    aria-label={`'${p.main_title || '제목 없음'}' 작성 중인 프로젝트 삭제`}
+                    disabled={deleteProject.isPending}
+                    onClick={(e) => {
+                      e.stopPropagation(); // 카드 클릭(이어서 작성)과 분리
+                      if (confirm(`작성 중인 '${p.main_title || '제목 없음'}' 프로젝트를 삭제할까요? 30일간 복구할 수 있습니다.`)) {
+                        deleteProject.mutate(p.id);
+                      }
+                    }}
+                  >
+                    삭제
+                  </button>
                   <div style={{
                     aspectRatio: '3 / 4', background: p.thumbnail_url ? `url(${p.thumbnail_url}) center/cover` : 'var(--bg-hover)',
                   }} />

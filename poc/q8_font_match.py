@@ -490,19 +490,26 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--image", default=os.path.join(POC, "input", "magician's room.jpg"))
     ap.add_argument("--force-ocr", action="store_true")
+    ap.add_argument("--ocr-json", help="LLM 대신 쓸 OCR 결과(q9_local_ocr.py가 만든 *_q8.json) — 사람 교정 없이 대조")
     ap.add_argument("--elements", help="분석 단계 텍스트 요소 목록(role|x|y|w|h|storage_path|label) — 주면 요소 캔버스에서 글자를 찾는다")
     args = ap.parse_args()
 
     poster = Image.open(args.image).convert("RGB")
     W, H = poster.size
     slug = os.path.splitext(os.path.basename(args.image))[0].replace("'", "").replace(" ", "_")
-    data = ocr(poster, os.path.join(OUT, f"{slug}_ocr.json"), args.force_ocr)
-    # 운영에서는 사용자가 화면에서 문구를 확인·수정한다. PoC는 확인 결과를 여기 적는다(LLM 오독 기록용)
-    corrections = CORRECTIONS.get(slug, {})
+    if args.ocr_json:
+        # 로컬 OCR 결과를 그대로 쓴다 — 사람 교정 없음(q9)
+        data = json.load(open(args.ocr_json, encoding="utf-8"))
+        slug = slug + "_" + data.get("_source", "ocr")
+        corrections = {}
+    else:
+        data = ocr(poster, os.path.join(OUT, f"{slug}_ocr.json"), args.force_ocr)
+        # 운영에서는 사용자가 화면에서 문구를 확인·수정한다. PoC는 확인 결과를 여기 적는다(LLM 오독 기록용)
+        corrections = CORRECTIONS.get(slug, {})
     for ln in data["lines"]:
         if ln["text"] in corrections:
             ln["ocr_text"], ln["text"] = ln["text"], corrections[ln["text"]]
-        fix = BBOX_CORRECTIONS.get(slug, {}).get(ln["text"])
+        fix = None if args.ocr_json else BBOX_CORRECTIONS.get(slug, {}).get(ln["text"])
         if fix:
             ln["ocr_bbox"] = ln["bbox"]
             ln["bbox"] = [fix[0] / poster.width, fix[1] / poster.height, fix[2] / poster.width, fix[3] / poster.height]
