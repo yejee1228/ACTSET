@@ -1,6 +1,7 @@
 package com.actset.conversion;
 
 import com.actset.common.ApiException;
+import com.actset.conversion.pdf.PdfPosterReader;
 import com.actset.domain.GeneratedAsset;
 import com.actset.domain.Job;
 import com.actset.domain.Project;
@@ -88,9 +89,26 @@ public class PosterUploadService {
         if (mainTitle == null || mainTitle.isBlank()) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "TITLE_REQUIRED", "공연명을 입력해주세요.");
         }
-        BufferedImage poster = readPoster(file);
         String folder = DesignElementStore.projectFolder(ownerId, projectId) + "/source/";
         String stamp = String.valueOf(System.currentTimeMillis());
+        byte[] raw = bytesOf(file);
+        String pdfPath = null;
+        int pdfRuns = -1;
+        BufferedImage poster;
+        if (isPdf(raw)) {
+            // PDF(캔바 "PDF 인쇄용" 등): 글자를 추정하지 않고 그대로 읽는다 — 대표 포스터는 글자 포함 렌더
+            try {
+                PdfPosterReader.Result pdf = new PdfPosterReader().read(raw, PDF_RENDER_LONG_SIDE);
+                poster = pdf.full();
+                pdfRuns = pdf.runs().size();
+            } catch (IOException e) {
+                throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "UNREADABLE_PDF", "PDF를 읽을 수 없습니다.");
+            }
+            pdfPath = folder + "poster_" + stamp + ".pdf";
+            storage.store(raw, pdfPath, "application/pdf");
+        } else {
+            poster = readPoster(file, raw);
+        }
         String posterPath = folder + "poster_" + stamp + ".png";
         String previewPath = folder + "poster_" + stamp + "_preview.jpg";
         byte[] png = DesignElementStore.png(poster);
@@ -133,6 +151,12 @@ public class PosterUploadService {
         assets.put("source_poster", posterPath);
         assets.put("analysis", "pending");
         assets.put("analysis_job_id", job.getId().toString());
+        if (pdfPath != null) {
+            assets.put("source_format", "pdf");
+            assets.put("source_pdf", pdfPath);
+            // 0이면 글자를 윤곽선으로 바꿔 내보낸 PDF — 이미지처럼 분석한다
+            assets.put("pdf_text_runs", pdfRuns);
+        }
         project.setDesignAssets(assets);
         project.setMainTitle(mainTitle.trim().length() > 100 ? mainTitle.trim().substring(0, 100) : mainTitle.trim());
         if (!"active".equals(project.getStatus())) {
@@ -144,8 +168,10 @@ public class PosterUploadService {
         return new Uploaded(projectId, job.getId(), analysisCost);
     }
 
-    /** jpg/png만, 20MB 이하, 짧은 변 300px 이상. 저장은 PNG로 통일(EXIF 등 메타데이터도 함께 제거된다). */
-    private BufferedImage readPoster(MultipartFile file) {
+    /** PDF 렌더 긴 변(px) — 규격 변환·인쇄 미리보기에 충분한 해상도(임시값). 텍스트 레이어는 벡터라 필요하면 더 키워 다시 그린다 */
+    public static final int PDF_RENDER_LONG_SIDE = 2000;
+
+    private static byte[] bytesOf(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "NO_FILE", "포스터 파일을 올려주세요.");
         }
@@ -153,9 +179,22 @@ public class PosterUploadService {
             throw new ApiException(HttpStatus.PAYLOAD_TOO_LARGE, "FILE_TOO_LARGE", "20MB 이하 파일만 올릴 수 있습니다.");
         }
         try {
-            BufferedImage img = ImageIO.read(new ByteArrayInputStream(file.getBytes()));
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "NO_FILE", "파일을 읽을 수 없습니다.");
+        }
+    }
+
+    static boolean isPdf(byte[] b) {
+        return b.length > 4 && b[0] == '%' && b[1] == 'P' && b[2] == 'D' && b[3] == 'F';
+    }
+
+    /** jpg/png는 짧은 변 300px 이상. 저장은 PNG로 통일(EXIF 등 메타데이터도 함께 제거된다). */
+    private BufferedImage readPoster(MultipartFile file, byte[] raw) {
+        try {
+            BufferedImage img = ImageIO.read(new ByteArrayInputStream(raw));
             if (img == null) {
-                throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_IMAGE", "JPG 또는 PNG 이미지만 올릴 수 있습니다.");
+                throw new ApiException(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "UNSUPPORTED_IMAGE", "JPG·PNG 이미지 또는 PDF만 올릴 수 있습니다.");
             }
             if (Math.min(img.getWidth(), img.getHeight()) < MIN_SIDE) {
                 throw new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "IMAGE_TOO_SMALL", "짧은 변이 300px 이상인 이미지를 올려주세요.");

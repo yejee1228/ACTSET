@@ -52,6 +52,8 @@ public class ElementExtractionService {
     static final double SMALL_RESIDUAL_AREA = 0.02;
     /** 임시값 — 잔여물 하나의 bbox가 캔버스의 이 비율을 넘으면 차이 추출을 하지 않는다. */
     static final double MAX_RESIDUAL_AREA = 0.30;
+    /** 임시값 — 퍼진 레이어 안에서 "또렷한 덩어리"로 볼 알파. */
+    static final int STRONG_ALPHA = 160;
     /** 역할 판정 시트에 올리는 최대 요소 수. 나머지(작은 조각)는 NOISE로 둔다. */
     static final int MAX_CLASSIFY = 48;
 
@@ -154,11 +156,22 @@ public class ElementExtractionService {
         for (int i = 0; i < restored.size(); i++) {
             if (i == backdropIdx || layerLog.get(i).path("uniform_discarded").asBoolean()) continue;
             if (ImageOps.isDiffuseOverlay(restored.get(i))) {
-                // 넓게 퍼진 반투명 레이어(빛줄기 등)는 쪼개지 않고 한 장으로 둔다
-                Rectangle b = ImageOps.alphaBounds(restored.get(i));
-                ((ObjectNode) layerLog.get(i)).put("diffuse_overlay", true);
-                candidates.add(new Extracted("L" + i + "_overlay", ElementRole.NOISE, "decomposed", null,
-                        restored.get(i).getSubimage(b.x, b.y, b.width, b.height), b, (i + 1) * 100, meta("layer", i)));
+                // 넓게 퍼진 반투명 레이어(빛줄기 등)는 한 장으로 두되, 그 안의 또렷한 덩어리(로고·모자 등)는 따로 뗀다
+                // (PDF 시험: 로고·모자가 안개 레이어에 섞여 캔버스 전체 크기 요소가 됐다)
+                BufferedImage layer = restored.get(i);
+                List<ElementSplitter.Element> solid = splitter.split(ImageOps.strongPart(layer, STRONG_ALPHA));
+                BufferedImage rest = ImageOps.subtract(layer, solid);
+                ((ObjectNode) layerLog.get(i)).put("diffuse_overlay", true).put("solid_parts", solid.size());
+                for (int k = 0; k < solid.size(); k++) {
+                    ElementSplitter.Element p = solid.get(k);
+                    candidates.add(new Extracted("L" + i + "_s" + (k + 1), ElementRole.NOISE, "split", null,
+                            ImageOps.cropOriginal(layer, p.bounds(), p.image()), p.bounds(), (i + 1) * 100 + 1 + k, meta("layer", i)));
+                }
+                Rectangle b = ImageOps.alphaBounds(rest);
+                if (b != null) {
+                    candidates.add(new Extracted("L" + i + "_overlay", ElementRole.NOISE, "decomposed", null,
+                            rest.getSubimage(b.x, b.y, b.width, b.height), b, (i + 1) * 100, meta("layer", i)));
+                }
                 continue;
             }
             List<ElementSplitter.Element> parts = splitter.split(restored.get(i));

@@ -121,6 +121,49 @@ public final class ImageOps {
         return any >= 0.3 * p.length && opaque < 0.01 * p.length;
     }
 
+    /** 알파 ≥ threshold 픽셀만 남긴 사본(나머지 투명). */
+    public static BufferedImage strongPart(BufferedImage img, int threshold) {
+        int w = img.getWidth(), h = img.getHeight();
+        int[] p = img.getRGB(0, 0, w, h, null, 0, w);
+        for (int i = 0; i < p.length; i++) if ((p[i] >>> 24) < threshold) p[i] = 0;
+        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        out.setRGB(0, 0, w, h, p, 0, w);
+        return out;
+    }
+
+    /** 떼어낸 덩어리 자리를 투명하게 비운 사본(덩어리 bbox 안에서 덩어리 픽셀만). */
+    public static BufferedImage subtract(BufferedImage img, java.util.List<com.actset.conversion.engine.ElementSplitter.Element> parts) {
+        BufferedImage out = toArgb(img) == img ? copyArgb(img) : toArgb(img);
+        for (var e : parts) {
+            Rectangle b = e.bounds();
+            for (int y = 0; y < b.height; y++) {
+                for (int x = 0; x < b.width; x++) {
+                    if ((e.image().getRGB(x, y) >>> 24) > 0) out.setRGB(b.x + x, b.y + y, 0);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** 덩어리 모양(splitImage의 알파>0 자리) 그대로, 원 레이어의 픽셀(옅은 글로우 포함)을 잘라 온다. */
+    public static BufferedImage cropOriginal(BufferedImage layer, Rectangle b, BufferedImage splitImage) {
+        BufferedImage out = new BufferedImage(b.width, b.height, BufferedImage.TYPE_INT_ARGB);
+        for (int y = 0; y < b.height; y++) {
+            for (int x = 0; x < b.width; x++) {
+                if ((splitImage.getRGB(x, y) >>> 24) > 0) out.setRGB(x, y, layer.getRGB(b.x + x, b.y + y));
+            }
+        }
+        return out;
+    }
+
+    private static BufferedImage copyArgb(BufferedImage src) {
+        BufferedImage c = new BufferedImage(src.getWidth(), src.getHeight(), BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = c.createGraphics();
+        g.drawImage(src, 0, 0, null);
+        g.dispose();
+        return c;
+    }
+
     /** 알파가 0이 아닌 영역의 bbox. 비어 있으면 null. */
     public static Rectangle alphaBounds(BufferedImage img) {
         int w = img.getWidth(), h = img.getHeight();
@@ -160,6 +203,9 @@ public final class ImageOps {
             level[3][i] = a;
         }
         float[][] filled = pushPull(level, w, h);
+        // push-pull의 거친 단계가 넓은 구멍을 계단 모양 블록으로 채운다 → 채운 값을 흐려 부드럽게(PDF 시험: 메운 자리가 사각형으로 보였다)
+        int blurR = Math.max(2, Math.min(w, h) / 80);
+        for (int c = 0; c < 4; c++) filled[c] = boxBlurFloat(filled[c], w, h, blurR);
         int[] out = new int[w * h];
         for (int i = 0; i < out.length; i++) {
             float a = (p[i] >>> 24) / 255f;
@@ -172,6 +218,32 @@ public final class ImageOps {
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         img.setRGB(0, 0, w, h, out, 0, w);
         return img;
+    }
+
+    private static float[] boxBlurFloat(float[] v, int w, int h, int r) {
+        float[] tmp = new float[v.length], out = new float[v.length];
+        for (int pass = 0; pass < 2; pass++) { // 두 번 = 삼각형 커널에 가깝다
+            float[] src = pass == 0 ? v : out;
+            for (int y = 0; y < h; y++) {
+                float acc = 0;
+                int n = 0;
+                for (int x = -r; x < w; x++) {
+                    if (x + r < w) { acc += src[y * w + x + r]; n++; }
+                    if (x - r - 1 >= 0) { acc -= src[y * w + x - r - 1]; n--; }
+                    if (x >= 0) tmp[y * w + x] = acc / n;
+                }
+            }
+            for (int x = 0; x < w; x++) {
+                float acc = 0;
+                int n = 0;
+                for (int y = -r; y < h; y++) {
+                    if (y + r < h) { acc += tmp[(y + r) * w + x]; n++; }
+                    if (y - r - 1 >= 0) { acc -= tmp[(y - r - 1) * w + x]; n--; }
+                    if (y >= 0) out[y * w + x] = acc / n;
+                }
+            }
+        }
+        return out;
     }
 
     private static float[][] pushPull(float[][] lv, int w, int h) {

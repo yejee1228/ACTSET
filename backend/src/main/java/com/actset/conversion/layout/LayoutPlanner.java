@@ -25,6 +25,8 @@ public final class LayoutPlanner {
     static final double MAX_UPSCALE = 3.0;
     /** DECOR를 블록에 붙일 때 블록 bbox를 원본 긴 변 대비 이만큼 넓혀 본다(임시값). */
     static final double DECOR_ATTACH_MARGIN = 0.08;
+    /** 임시값 — 원본 캔버스의 이 비율 이상(가로·세로 모두)을 덮는 요소는 배경판처럼 다룬다. */
+    static final double FULL_CANVAS = 0.85;
 
     public record SourceElement(String id, ElementRole role, BufferedImage image, Rectangle bounds, int sourceZ) {
     }
@@ -44,6 +46,12 @@ public final class LayoutPlanner {
         Map<LayoutBlock, List<SourceElement>> members = new EnumMap<>(LayoutBlock.class);
 
         for (SourceElement e : elements) {
+            // 캔버스를 거의 다 덮는 요소(넓게 퍼진 빛·안개 레이어 등)는 역할과 관계없이 배경판 변환을 따른다.
+            // 블록에 넣으면 블록이 캔버스만큼 커져 제목·키비주얼이 작게 축소된다(PDF 시험: 장식·로고 전체 레이어 3장)
+            if (fullCanvas(e, sourceWidth, sourceHeight)) {
+                placeBackdrop(e, sourceWidth, sourceHeight, rule, width, height, layers, placements);
+                continue;
+            }
             switch (e.role()) {
                 case BACKDROP -> placeBackdrop(e, sourceWidth, sourceHeight, rule, width, height, layers, placements);
                 case TITLE -> add(members, LayoutBlock.HEADLINE, e);
@@ -63,7 +71,9 @@ public final class LayoutPlanner {
         }
         int longSide = Math.max(sourceWidth, sourceHeight);
         for (SourceElement e : elements) {
-            if (e.role() == ElementRole.DECOR) add(members, nearestBlock(e, members, longSide), e);
+            if (e.role() == ElementRole.DECOR && !fullCanvas(e, sourceWidth, sourceHeight)) {
+                add(members, nearestBlock(e, members, longSide), e);
+            }
         }
 
         Map<LayoutBlock, Rectangle2D> blockRects = new EnumMap<>(LayoutBlock.class);
@@ -142,6 +152,11 @@ public final class LayoutPlanner {
      * 역할 기본 순서(docs/05 BACKDROP→…→MARK)로 다시 정렬하면 안 된다 — 2차 실행에서 달 글로우(DECOR)가 마술사
      * (SUBJECT) 위로 올라가 실루엣이 뿌옇게 덮였다. 역할 순서가 필요한 생산자(시안 생성 경로)는 sourceZ에 반영해 넘긴다.
      */
+    private static boolean fullCanvas(SourceElement e, int sourceWidth, int sourceHeight) {
+        return e.role() != ElementRole.BACKDROP && e.role() != ElementRole.NOISE && e.role() != ElementRole.FRAME
+                && e.bounds().width >= FULL_CANVAS * sourceWidth && e.bounds().height >= FULL_CANVAS * sourceHeight;
+    }
+
     private static int z(SourceElement e) {
         return e.sourceZ();
     }

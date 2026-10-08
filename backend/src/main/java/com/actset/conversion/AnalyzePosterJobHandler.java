@@ -1,6 +1,9 @@
 package com.actset.conversion;
 
 import com.actset.common.ApiException;
+import com.actset.conversion.layout.ElementRole;
+import com.actset.conversion.pdf.PdfPosterReader;
+import com.actset.conversion.pdf.PdfTextRoles;
 import com.actset.domain.Job;
 import com.actset.domain.Project;
 import com.actset.repository.ProjectRepository;
@@ -14,6 +17,8 @@ import org.springframework.stereotype.Component;
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * jobs.kind = 'analyze_poster' — 업로드한 포스터를 요소로 분석한다(②~⑤, 프로젝트당 1회 — docs/05 "분해는 1회").
@@ -48,14 +53,41 @@ public class AnalyzePosterJobHandler implements JobHandler {
         return KIND;
     }
 
+    /** PDF 텍스트 줄을 요소로 덧붙인다. 그리는 순서(=PDF 순서) 그대로 그림 요소 위에 쌓는다(그림자 사본 → 본체). */
+    private ElementExtractionService.Result withPdfText(ElementExtractionService.Result r, PdfPosterReader.Result pdf) {
+        List<ElementExtractionService.Extracted> els = new ArrayList<>(r.elements());
+        for (PdfPosterReader.TextRun run : pdf.runs()) {
+            ObjectNode meta = objectMapper.createObjectNode();
+            meta.put("text", run.text());
+            meta.put("font_name", run.fontName());
+            meta.put("font_size_px", Math.round(run.sizePx() * 10) / 10.0);
+            meta.put("color", String.format("#%06X", run.rgb() & 0xffffff));
+            meta.put("pdf_run", run.order());
+            ElementRole role = PdfTextRoles.roleOf(run, pdf.runs(), pdf.height());
+            els.add(new ElementExtractionService.Extracted("P" + run.order(), role, "pdf_text", run.text(), run.layer(),
+                    run.bounds(), 5000 + run.order(), meta));
+        }
+        r.log().put("pdf_text_runs", pdf.runs().size());
+        return new ElementExtractionService.Result(r.width(), r.height(), els, r.log());
+    }
+
     @Override
     public ObjectNode handle(Job job) throws Exception {
         Project project = projectRepository.findById(job.getProjectId()).orElseThrow(ApiException::notFound);
         String posterPath = project.getDesignAssets().path("source_poster").asText();
         BufferedImage poster = ImageIO.read(new ByteArrayInputStream(storage.read(posterPath)));
 
+        // PDF이고 글자가 들어 있으면: 그림은 "글자 뺀 렌더"로 분해하고, 텍스트는 PDF에서 그대로 만든다(LLM·폰트 대조 없음)
+        PdfPosterReader.Result pdf = null;
+        String pdfPath = project.getDesignAssets().path("source_pdf").asText(null);
+        if (pdfPath != null && project.getDesignAssets().path("pdf_text_runs").asInt(0) > 0) {
+            pdf = new PdfPosterReader().read(storage.read(pdfPath), PosterUploadService.PDF_RENDER_LONG_SIDE);
+            poster = pdf.noText();
+        }
+
         ElementExtractionService.Result result = extraction.extract(poster, ElementExtractionService.DebugSink.NOOP, null,
                 (step, total, label, from, to, sec) -> jobService.progress(job.getId(), step, total, label, from, to, sec));
+        if (pdf != null) result = withPdfText(result, pdf);
         jobService.progress(job.getId(), ElementExtractionService.TOTAL_STAGES, ElementExtractionService.TOTAL_STAGES,
                 "분리한 요소를 저장하는 중", 96, 100, 3);
         int saved = store.replaceAll(project.getOwnerId(), project.getId(), result).size();

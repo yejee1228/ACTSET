@@ -72,6 +72,7 @@ export default function PosterUploadPage() {
     }
   }
 
+  const isPdf = !!file && (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'));
   const analyzing = !!jobId && (!job || job.status === 'pending' || job.status === 'running');
 
   return (
@@ -90,14 +91,18 @@ export default function PosterUploadPage() {
             <label className="field-label">공연명</label>
             <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="예: 반짝반짝 빛나는 마술사의 방"
                    style={{ marginBottom: 'var(--sp-4)' }} />
-            <label className="field-label">포스터 (JPG·PNG, 20MB 이하)</label>
-            <input type="file" accept="image/jpeg,image/png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <label className="field-label">포스터 (PDF·JPG·PNG, 20MB 이하)</label>
+            <input type="file" accept="application/pdf,image/jpeg,image/png" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <p className="caption" style={{ color: 'var(--gray-warm)', marginTop: 'var(--sp-2)' }}>
+              캔바 등에서 만든 포스터라면 <strong>PDF(인쇄용)</strong>로 올려 주세요. 글자·폰트를 그대로 읽어 규격마다 더 선명하게 다시 배치할 수 있어요.
+            </p>
             <p className="caption" style={{ color: 'var(--warning)', marginTop: 'var(--sp-2)' }}>
               요소 분리와 배경 정리를 위해 포스터가 외부 AI로 전송됩니다. 포스터 안에 들어 있는 인물 사진·로고도 함께 전송됩니다.
             </p>
-            {preview && (
+            {preview && !isPdf && (
               <img src={preview} alt="올릴 포스터" style={{ marginTop: 'var(--sp-4)', maxHeight: 360, borderRadius: 'var(--r-md)' }} />
             )}
+            {file && isPdf && <p className="body-sm" style={{ marginTop: 'var(--sp-3)' }}>PDF: {file.name}</p>}
             {error && <p className="body-sm" style={{ marginTop: 'var(--sp-3)', color: 'var(--error)' }}>{error}</p>}
             <div style={{ marginTop: 'var(--sp-5)' }}>
               <button className="btn btn-primary" disabled={!file || !title.trim() || submitting} onClick={submit}>
@@ -109,7 +114,7 @@ export default function PosterUploadPage() {
 
         {jobId && (
           <div className="card" style={{ padding: 'var(--sp-5)' }}>
-            {preview && (
+            {preview && !isPdf && (
               <img src={preview} alt="올린 포스터" style={{ maxHeight: 320, borderRadius: 'var(--r-md)', marginBottom: 'var(--sp-4)' }} />
             )}
             {(analyzing || job?.status === 'failed') && (
