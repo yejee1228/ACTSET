@@ -18,3 +18,15 @@ for d in $FAMILIES; do
   done
 done
 ls | wc -l
+
+# 2026-10-09 추가 — 포스터에 많이 쓰이는 무료 한글 폰트(상업 사용 + 서버 임베딩 허용 확인, poc/FONT-LICENSES.md)
+# 원본 보관 저장소 github.com/fonts-archive 에서 TTF만 받는다
+mkdir -p kr_free
+REPOS="BMHANNA11yrs BMHANNAAir BMHANNAPro BMEULJIRO BMEuljiro10yearslater BMEuljiroOraeorae BMKkubulim Jalnan JalnanGothic GmarketSans Cafe24Ssurround Cafe24SsurroundAir Cafe24Ohsquare Cafe24OhsquareAir Cafe24Dongdong NEXONLv1Gothic NEXONLv2Gothic Maplestory KartriderKor CookieRun Aggro TmonMonsori S-CoreDream NanumSquare NanumSquareNeo NanumSquareRound"
+for r in $REPOS; do
+  # 파일 목록은 jsDelivr API로(GitHub API 비인증 한도 회피), 파일은 jsDelivr CDN에서. 하위 폴더(subsets)는 뺀다
+  for f in $(curl -s "https://data.jsdelivr.com/v1/packages/gh/fonts-archive/$r@main?structure=flat" | grep -o '"name": *"/[^"/]*\.ttf"' | sed 's/"name": *"\///; s/"$//'); do
+    [ -f "kr_free/$f" ] || curl -sL -o "kr_free/$f" "https://cdn.jsdelivr.net/gh/fonts-archive/$r@main/$f"
+  done
+done
+ls kr_free | wc -l

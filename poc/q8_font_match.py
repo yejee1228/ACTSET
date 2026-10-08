@@ -292,6 +292,10 @@ def element_canvas(size, listing, storage_root):
 
 def font_candidates():
     cands = []
+    # kr_free/: 상업 사용 + 서버 임베딩 허용이 확인된 무료 한글 폰트(poc/FONT-LICENSES.md)
+    for path in sorted(glob.glob(os.path.join(FONT_DIR, "kr_free", "*.ttf"))):
+        cands.append({"path": path, "name": os.path.splitext(os.path.basename(path))[0], "wght": None,
+                      "license": "무료(임베딩 허용)"})
     for path in sorted(glob.glob(os.path.join(FONT_DIR, "*.ttf"))) + PRETENDARD:
         name = os.path.splitext(os.path.basename(path))[0]
         if "[" in name:  # 가변 폰트 → 굵기별 인스턴스
