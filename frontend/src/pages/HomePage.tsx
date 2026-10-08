@@ -12,6 +12,7 @@ interface ProjectListItem {
   date_undetermined: boolean;
   thumbnail_url: string | null;
   updated_at: string;
+  source: string | null;
 }
 
 /** 0-B 홈 대시보드(1-6). active 프로젝트만 노출, 빈 상태·검색을 지원한다(docs/04). */
@@ -32,10 +33,8 @@ export default function HomePage() {
     queryFn: () => api.get<{ items: ProjectListItem[] }>('/projects?status=draft'),
   });
 
-  const createProject = useMutation({
-    mutationFn: () => api.post<{ id: string }>('/projects'),
-    onSuccess: (project) => navigate(`/projects/${project.id}/info`),
-  });
+  // 시작 방법(AI로 만들기 / 가지고 있는 포스터로 시작)은 선택 화면에서 고른다
+  const createProject = { mutate: () => navigate('/projects/new'), isPending: false };
 
   const deleteProject = useMutation({
     mutationFn: (id: string) => api.del(`/projects/${id}`),
@@ -62,7 +61,7 @@ export default function HomePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--sp-4)' }}>
               {draftItems.map((p) => (
                 <div key={p.id} className="card" style={{ overflow: 'hidden', position: 'relative', cursor: 'pointer' }}
-                     onClick={() => navigate(`/projects/${p.id}/info`)}>
+                     onClick={() => navigate(p.source === 'uploaded_poster' ? `/projects/${p.id}/upload-poster` : `/projects/${p.id}/info`)}>
                   <span className="badge badge-neutral" style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>작성 중</span>
                   <div style={{
                     aspectRatio: '3 / 4', background: p.thumbnail_url ? `url(${p.thumbnail_url}) center/cover` : 'var(--bg-hover)',

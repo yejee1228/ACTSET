@@ -39,6 +39,11 @@ public class Job {
     @JdbcTypeCode(SqlTypes.JSON)
     private JsonNode result;
 
+    /** 진행 단계(V11) — JobService.progress가 기록, GET /jobs/{id}의 stage로 노출. */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "progress")
+    private JsonNode progress;
+
     private String error;
 
     @Column(nullable = false)

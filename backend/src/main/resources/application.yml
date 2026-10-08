@@ -42,6 +42,8 @@ actset:
     root: ${STORAGE_ROOT:../storage}
   credit:
     signup-grant: 20
+    # 포스터 업로드형 프로젝트의 포스터 분석 1회(분해·배경 검증·역할 판정). 단가 미정 — 확정 전 0(FORMAT-CONVERSION-REPORT.md §9-2)
+    poster-analysis-cost: ${POSTER_ANALYSIS_COST:0}
   external:
     ideogram:
       api-key: ${IDEOGRAM_API_KEY:}

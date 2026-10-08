@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
-import { api, ApiError, FormatPresetDto } from '../lib/api';
+import { JobProgressBar } from '../components/JobProgressBar';
+import { api, ApiError, FormatPresetDto, JobStatus, ProjectDetail } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
 
 const GROUP_LABELS: Record<string, string> = {
@@ -19,6 +20,23 @@ export default function Step5FormatSelectionPage() {
   useEffect(() => { trackFunnelStep('step_5_formats'); }, []);
 
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // 업로드 포스터 프로젝트(U-1)는 포스터 분석이 끝나야 변환할 수 있다
+  const { data: project } = useQuery({
+    queryKey: ['project', id],
+    queryFn: () => api.get<ProjectDetail>(`/projects/${id}`),
+    enabled: !!id,
+  });
+  const uploaded = project?.design_assets?.source === 'uploaded_poster';
+  const analysisJobId = uploaded ? (project?.design_assets?.analysis_job_id as string | undefined) : undefined;
+  const { data: analysisJob } = useQuery({
+    queryKey: ['job', analysisJobId],
+    queryFn: () => api.get<JobStatus>(`/jobs/${analysisJobId}`),
+    enabled: !!analysisJobId && project?.design_assets?.analysis !== 'done',
+    refetchInterval: (q) => (q.state.data && ['succeeded', 'failed', 'canceled'].includes(q.state.data.status) ? false : 3000),
+  });
+  const analysisDone = !uploaded || project?.design_assets?.analysis === 'done' || analysisJob?.status === 'succeeded';
+  const analysisFailed = uploaded && analysisJob?.status === 'failed';
 
   const { data } = useQuery({
     queryKey: ['formats'],
@@ -61,10 +79,28 @@ export default function Step5FormatSelectionPage() {
         <h1 className="h1" style={{ marginBottom: 'var(--sp-2)' }}>어떤 규격이 필요하세요?</h1>
         <p className="body-sm" style={{ marginBottom: 'var(--sp-6)' }}>필요한 만큼 골라서 한 번에 만들 수 있어요.</p>
 
-        <div className="card" style={{ padding: 'var(--sp-5)', marginBottom: 'var(--sp-6)', opacity: 0.6 }}>
-          <h3 className="h3">원본 — 포스터 다시 만들기</h3>
-          <p className="body-sm">이 기능은 곧 지원 예정입니다.</p>
-        </div>
+        {uploaded ? (
+          <div className="card" style={{ padding: 'var(--sp-5)', marginBottom: 'var(--sp-6)' }}>
+            <h3 className="h3">원본 — 올린 포스터</h3>
+            {!analysisDone && !analysisFailed && (
+              <div style={{ margin: 'var(--sp-2) 0' }}>
+                <JobProgressBar status={analysisJob?.status} stage={analysisJob?.stage} waitingLabel="분석 순서를 기다리는 중" />
+                <p className="caption" style={{ color: 'var(--gray-warm)', marginTop: 'var(--sp-2)' }}>분석이 끝나면 규격을 만들 수 있어요(보통 2~3분).</p>
+              </div>
+            )}
+            {analysisFailed && (
+              <p className="body-sm" style={{ color: 'var(--error)' }}>포스터 분석에 실패했어요. 다른 포스터를 올려 주세요.</p>
+            )}
+            {analysisDone && <p className="body-sm">분석이 끝났어요. 이 포스터의 요소를 규격마다 다시 배치해요.</p>}
+            <button className="btn btn-tertiary btn-sm" style={{ marginTop: 'var(--sp-2)' }}
+                    onClick={() => navigate(`/projects/${id}/upload-poster`)}>다른 포스터 올리기</button>
+          </div>
+        ) : (
+          <div className="card" style={{ padding: 'var(--sp-5)', marginBottom: 'var(--sp-6)', opacity: 0.6 }}>
+            <h3 className="h3">원본 — 포스터 다시 만들기</h3>
+            <p className="body-sm">이 기능은 곧 지원 예정입니다.</p>
+          </div>
+        )}
 
         {groups.map((group) => (
           <div key={group} style={{ marginBottom: 'var(--sp-6)' }}>
@@ -95,7 +131,7 @@ export default function Step5FormatSelectionPage() {
           <p className="body-sm" style={{ marginBottom: 'var(--sp-3)', color: 'var(--error)' }}>{submitError}</p>
         )}
         <button className="btn btn-primary"
-                disabled={selected.size === 0 || requestRecompose.isPending || (estimate ? !estimate.sufficient : false)}
+                disabled={!analysisDone || selected.size === 0 || requestRecompose.isPending || (estimate ? !estimate.sufficient : false)}
                 onClick={() => { setSubmitError(null); requestRecompose.mutate(); }}>
           일괄변환 생성 ({selected.size}종)
         </button>

@@ -311,6 +311,9 @@ kind: performance_photo | cast_photo | logo | reference_image
 
 ---
 
+
+**`stage` (2026-10-08 추가)**: 진행 바용 단계 정보. `{ "step": 2, "total": 6, "label": "요소를 하나씩 분리하는 중", "from": 55, "to": 60, "expected_sec": 5, "started_at": "..." }`. 단계가 아직 기록되지 않았으면 null. 화면은 `from`~`to` 구간 안을 `expected_sec` 기준으로 추정해 채운다. 타인 프로젝트의 작업은 404.
+
 ## 4. 결과물
 
 ### `GET /projects/{id}/assets`
@@ -395,20 +398,20 @@ kind: performance_photo | cast_photo | logo | reference_image
 
 커스텀 규격이 열리면 이 목록에 없는 치수를 `recompose` 요청에 직접 담는다(`{"format_code":"CUSTOM","width":1200,"height":400}`). 규칙은 `ratio_bucket`으로 찾아 적용한다(Stage 12).
 
-### `GET /format-classes` · `POST /conversions` — 포스터 업로드형 규격변환 (2026-10-07 추가)
+### `POST /projects?mode=upload` · `POST /projects/{id}/poster` — 업로드 포스터 플로우 (U-1, 2026-10-08)
 
-고객이 가진 포스터 한 장을 MVP 5분류(긴 세로·세로·정사각·가로·긴 가로, docs/12) 규격으로 바꾼다. 화면: `/convert`.
+`POST /projects?mode=upload` → 업로드 경로 표시(`design_assets.source = "uploaded_poster"`)가 붙은 draft. mode를 생략하면 기존 AI 생성 경로.
 
-`GET /format-classes` → `{ "items": [{ "code": "PORTRAIT", "label": "세로", "width": 1080, "height": 1920, "example": "SNS 스토리" }, ...], "cost_per_format": 2 }`
-
-`POST /conversions` (multipart) — `poster`(JPG·PNG, 20MB 이하, 짧은 변 300px 이상), `format_classes`(여러 번)
+`POST /projects/{id}/poster` (multipart) — `poster`(JPG·PNG, 20MB 이하, 짧은 변 300px 이상), `main_title`(필수)
 
 ```jsonc
 // 202
-{ "project_id": "uuid", "job_id": "uuid", "credit_cost": 4, "format_classes": ["PORTRAIT", "LANDSCAPE"] }
+{ "project_id": "uuid", "job_id": "uuid", "credit_cost": 0 }
 ```
 
-새 프로젝트를 만들고 `format_convert` 작업 1건을 등록하며, 같은 트랜잭션에서 규격당 2C를 차감한다(실패 시 job 단위 환불). 진행은 `GET /jobs/{id}`, 결과는 `GET /projects/{id}/assets?category=규격변환`. **포스터가 외부 AI(분해·배경 검증·재생성)로 전송된다** — 화면에 고지한다(docs/15 결정 필요, FORMAT-CONVERSION-REPORT.md).
+프로젝트를 `active`로 확정하고, 포스터를 대표 포스터(`category='포스터'`, `format_code='CUSTOM'`)로 등록한 뒤 `analyze_poster` 작업을 등록한다. 다시 올리면 대표 포스터·요소를 교체한다. 분석 상태는 `GET /projects/{id}`의 `design_assets.analysis`(`pending`→`done`)와 `analysis_job_id`로 알 수 있다. **포스터가 외부 AI(분해·배경 검증·재생성·역할 판정)로 전송된다** — 화면에 고지한다(docs/15 결정 필요).
+
+이후 규격 변환은 기존 `POST /projects/{id}/recompose`를 그대로 쓴다. 업로드 포스터 프로젝트는 분석 전이면 `409 POSTER_ANALYZING`, 분석 후에는 규격별 하위 작업이 `format_convert`로 등록된다. `GET /projects` 목록 항목에 `source`가 추가됐다.
 
 ### `POST /projects/{id}/print-renders`
 ⑧에서 지정한 인쇄 크기(mm)·dpi로 레이어 스택을 재합성한다(5-3). 비주얼 레이어는 업스케일, 텍스트는 재렌더링, **PHOTO는 업로드 원본을 직접 재배치**한다(외부 업스케일러에 보내지 않는다 — Stage 5).

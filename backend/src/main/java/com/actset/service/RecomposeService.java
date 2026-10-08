@@ -1,6 +1,8 @@
 package com.actset.service;
 
 import com.actset.common.ApiException;
+import com.actset.conversion.FormatConvertJobHandler;
+import com.actset.conversion.PosterUploadService;
 import com.actset.domain.Job;
 import com.actset.domain.Project;
 import com.actset.format.FormatPreset;
@@ -47,7 +49,15 @@ public class RecomposeService {
     @Transactional
     public RecomposeResult requestRecompose(UUID projectId, UUID ownerId, List<String> formatCodes, int variantsPerFormat, String mode) {
         Project project = projectService.getOwned(projectId, ownerId);
-        if (project.getDesignAssets() == null || !project.getDesignAssets().has("visual_layers")
+        boolean uploadedPoster = project.getDesignAssets() != null
+                && PosterUploadService.SOURCE_UPLOADED.equals(project.getDesignAssets().path("source").asText());
+        if (uploadedPoster) {
+            // 업로드 포스터 프로젝트(docs/03 U-1): 분석(analyze_poster)이 끝나 요소가 저장돼 있어야 변환할 수 있다
+            if (!"done".equals(project.getDesignAssets().path("analysis").asText())) {
+                throw new ApiException(HttpStatus.CONFLICT, "POSTER_ANALYZING",
+                        "포스터를 분석하는 중입니다. 분석이 끝나면 규격을 만들 수 있어요.");
+            }
+        } else if (project.getDesignAssets() == null || !project.getDesignAssets().has("visual_layers")
                 || project.getDesignAssets().get("visual_layers").isEmpty()) {
             throw new ApiException(HttpStatus.CONFLICT, "NO_DESIGN_ASSETS",
                     "먼저 시안을 확정해 원본을 만들어야 규격 변환을 할 수 있습니다.");
@@ -84,7 +94,9 @@ public class RecomposeService {
             payload.put("height", preset.height());
             payload.put("variants", variantsPerFormat);
 
-            Job child = jobService.enqueue("recompose", projectId, payload, parent.getId());
+            // 업로드 포스터는 새 규격변환 엔진(저장된 요소 재배치), AI 생성 포스터는 기존 recompose
+            Job child = jobService.enqueue(uploadedPoster ? FormatConvertJobHandler.KIND : "recompose",
+                    projectId, payload, parent.getId());
             int cost = costEstimateService.recomposeCostPerFormat(mode);
             String label = "regenerate".equals(mode) ? "규격 재생성 " : "규격 변환 ";
             creditService.consume(ownerId, cost, child.getId(), label + code);

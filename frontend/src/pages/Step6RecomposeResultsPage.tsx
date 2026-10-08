@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
+import { JobProgressBar } from '../components/JobProgressBar';
 import { api, ApiError, AssetItem } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
 
@@ -105,6 +106,12 @@ export default function Step6RecomposeResultsPage() {
           <h1 className="h1">규격별 결과물</h1>
           <span className="body-sm tabular">{confirmedCount}/{formatCodes.length} 규격 확정</span>
         </div>
+
+        {job?.progress && job.progress.done < job.progress.total && (
+          <div style={{ marginBottom: 'var(--sp-5)' }}>
+            <JobProgressBar batch={job.progress} />
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: 'var(--sp-2)', marginBottom: 'var(--sp-5)', flexWrap: 'wrap' }}>
           {formatCodes.map((code) => {

@@ -46,12 +46,16 @@ public class JobController {
     @GetMapping("/api/v1/jobs/{jobId}")
     public Map<String, Object> get(@PathVariable UUID jobId) {
         Job job = jobRepository.findById(jobId).orElseThrow(ApiException::notFound);
+        // 타인 프로젝트의 작업은 404(CLAUDE.md 규칙 7). 프로젝트 없는 작업은 사용자에게 노출할 대상이 아니다.
+        if (job.getProjectId() == null) throw ApiException.notFound();
+        projectService.getOwned(job.getProjectId(), CurrentUser.id());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("id", job.getId().toString());
         body.put("kind", job.getKind());
         body.put("status", job.getStatus());
         body.put("error", job.getError());
         body.put("result", job.getResult());
+        body.put("stage", job.getProgress()); // 진행 단계(진행 바) — 없으면 null
 
         List<Job> children = jobRepository.findByParentJobId(job.getId());
         if (!children.isEmpty()) {

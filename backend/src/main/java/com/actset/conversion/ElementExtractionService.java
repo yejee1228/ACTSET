@@ -74,6 +74,20 @@ public class ElementExtractionService {
         }
     }
 
+    /**
+     * 진행 단계 알림(진행 바). total은 분석 전체 단계 수, from·to는 전체 진행률 구간(%), expectedSec는 예상 시간(추정치).
+     * 분석 단계: 1 분해 → 2 요소 분리 → 3 배경 확인 → 4 배경 다시 그리기(필요할 때만) → 5 역할 판정 → 6 저장(호출부)
+     */
+    @FunctionalInterface
+    public interface ProgressListener {
+        ProgressListener NOOP = (step, total, label, from, to, expectedSec) -> {
+        };
+
+        void stage(int step, int total, String label, int from, int to, int expectedSec);
+    }
+
+    public static final int TOTAL_STAGES = 6;
+
     private final PosterLayerSplitAdapter layerSplit;
     private final VisionAnalysisAdapter vision;
     private final ImageEditAdapter imageEdit;
@@ -91,17 +105,24 @@ public class ElementExtractionService {
     }
 
     public Result extract(BufferedImage poster, DebugSink debug) throws Exception {
-        return extract(poster, debug, null);
+        return extract(poster, debug, null, ProgressListener.NOOP);
+    }
+
+    public Result extract(BufferedImage poster, DebugSink debug, List<BufferedImage> preDecomposed) throws Exception {
+        return extract(poster, debug, preDecomposed, ProgressListener.NOOP);
     }
 
     /** @param preDecomposed null이 아니면 분해 API를 부르지 않고 이 레이어를 쓴다(테스트 재실행 시 과금 방지). */
-    public Result extract(BufferedImage poster, DebugSink debug, List<BufferedImage> preDecomposed) throws Exception {
+    public Result extract(BufferedImage poster, DebugSink debug, List<BufferedImage> preDecomposed,
+                          ProgressListener progress) throws Exception {
         BufferedImage original = ImageOps.toArgb(poster);
         int w = original.getWidth(), h = original.getHeight();
         ObjectNode log = objectMapper.createObjectNode();
         List<Extracted> elements = new ArrayList<>();
 
         // ② 분해 ------------------------------------------------------------
+        // 예상 시간은 2026-10-07 실측(분해 102~109초, 배경 확인 5~15초, 재생성 40초, 역할 판정 20~23초)
+        progress.stage(1, TOTAL_STAGES, "포스터를 레이어로 나누는 중", 3, 55, 105);
         long t0 = System.currentTimeMillis();
         List<BufferedImage> raw = preDecomposed != null ? preDecomposed : layerSplit.decompose(original, NUM_LAYERS);
         log.put("decompose_reused", preDecomposed != null);
@@ -127,6 +148,7 @@ public class ElementExtractionService {
         debug.image("02_layers_sheet", ImageOps.numberedSheet(raw, 360, Math.min(raw.size(), 6)));
         log.put("backdrop_layer", backdropIdx);
 
+        progress.stage(2, TOTAL_STAGES, "요소를 하나씩 분리하는 중", 55, 60, 5);
         // ④ 재분리(배경 아닌 레이어) ------------------------------------------------
         List<Extracted> candidates = new ArrayList<>();
         for (int i = 0; i < restored.size(); i++) {
@@ -156,6 +178,7 @@ public class ElementExtractionService {
         BufferedImage filled = ImageOps.fillHoles(backdropRaw);
         debug.image("03_backdrop_filled", filled);
 
+        progress.stage(3, TOTAL_STAGES, "배경에 다른 요소가 남았는지 확인하는 중", 60, 68, 12);
         t0 = System.currentTimeMillis();
         BackdropCheck check = vision.checkBackdrop(backdropRaw);
         ObjectNode checkLog = log.putObject("backdrop_check");
@@ -185,6 +208,7 @@ public class ElementExtractionService {
             checkLog.put("local_fill", true);
             debug.image("03_backdrop_local_fill", backdrop);
         } else {
+            progress.stage(4, TOTAL_STAGES, "배경을 깨끗하게 다시 그리는 중", 68, 84, 42);
             t0 = System.currentTimeMillis();
             BufferedImage regenerated = imageEdit.edit(filled, check.editInstruction(), false);
             checkLog.put("regenerate_ms", System.currentTimeMillis() - t0);
@@ -214,6 +238,7 @@ public class ElementExtractionService {
         elements.add(new Extracted("BACKDROP", ElementRole.BACKDROP, backdropOrigin, "배경판", backdrop,
                 new Rectangle(0, 0, w, h), 0, meta("layer", backdropIdx)));
 
+        progress.stage(5, TOTAL_STAGES, "요소마다 역할(제목·키비주얼·정보 등)을 판정하는 중", 84, 96, 22);
         // 역할 판정 ----------------------------------------------------------------
         candidates.sort(Comparator.comparingInt((Extracted e) -> e.bounds().width * e.bounds().height).reversed());
         List<Extracted> toClassify = candidates.subList(0, Math.min(MAX_CLASSIFY, candidates.size()));

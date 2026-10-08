@@ -140,7 +140,11 @@ export default function ProjectDashboardPage() {
               {poster?.image_url && (
                 <a href={poster.image_url} target="_blank" rel="noreferrer" className="btn btn-secondary btn-sm">다운로드</a>
               )}
-              <button className="btn btn-tertiary btn-sm" onClick={() => navigate(`/projects/${id}/drafts`)}>다시 만들기</button>
+              {project?.design_assets?.source === 'uploaded_poster' ? (
+                <button className="btn btn-tertiary btn-sm" onClick={() => navigate(`/projects/${id}/upload-poster`)}>다른 포스터 올리기</button>
+              ) : (
+                <button className="btn btn-tertiary btn-sm" onClick={() => navigate(`/projects/${id}/drafts`)}>다시 만들기</button>
+              )}
             </div>
 
             {project?.status === 'active' && (
