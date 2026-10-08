@@ -35,7 +35,7 @@ from scipy import ndimage
 POC = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(POC)
 OUT = os.path.join(POC, "out", "font-match")
-FONT_DIR = os.path.join(POC, "fonts")
+FONT_DIR = os.path.join(POC, "fonts")  # bash poc/fonts_download.sh 로 내려받는다
 os.makedirs(OUT, exist_ok=True)
 
 # 식별에만 쓰는 로컬 폰트 — 서버 배포·재배포 라이선스가 없을 수 있다. 1위로 나오면 "비슷한 OFL 폰트"로 대체해야 한다
