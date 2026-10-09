@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
-import { api, ProjectDetail } from '../lib/api';
+import { api, ApiError, ProjectDetail } from '../lib/api';
+import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../lib/dateInput';
 
 const GENRES = ['클래식', '무용', '연극', '뮤지컬', '어린이공연', '인디밴드', '대중음악'];
 
@@ -14,6 +15,8 @@ const GENRES = ['클래식', '무용', '연극', '뮤지컬', '어린이공연',
 export default function InfoEditPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const { data: project } = useQuery({
     queryKey: ['project', id],
@@ -31,7 +34,6 @@ export default function InfoEditPage() {
   const [runningTime, setRunningTime] = useState('');
   const [age, setAge] = useState('');
   const [imageDirectionNote, setImageDirectionNote] = useState('');
-  const [savedAt, setSavedAt] = useState<string | null>(null);
 
   useEffect(() => {
     if (!project) return;
@@ -60,7 +62,13 @@ export default function InfoEditPage() {
       sessions: [{ date: dateUndetermined ? null : date, is_undetermined: dateUndetermined }],
       subtitle, running_time: runningTime, age, image_direction_note: imageDirectionNote,
     }),
-    onSuccess: () => setSavedAt(new Date().toLocaleTimeString('ko-KR')),
+    // 저장하면 홈으로 — 목록·프로젝트 캐시를 새로 받게 무효화한다(제목·날짜가 홈 카드에 보인다)
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      navigate('/home');
+    },
+    onError: (err) => setSaveError(err instanceof ApiError ? err.message : '저장에 실패했습니다.'),
   });
 
   return (
@@ -104,7 +112,7 @@ export default function InfoEditPage() {
             <label className="field-label" htmlFor="date">날짜</label>
             <div style={{ display: 'flex', gap: 'var(--sp-3)', alignItems: 'center' }}>
               <input id="date" type="date" className="input" value={date ?? ''} disabled={dateUndetermined}
-                     onChange={(e) => setDate(e.target.value)} />
+                     min={DATE_INPUT_MIN} max={DATE_INPUT_MAX} onChange={(e) => setDate(e.target.value)} />
               <label style={{ display: 'flex', gap: 4, alignItems: 'center', whiteSpace: 'nowrap' }}>
                 <input type="checkbox" checked={dateUndetermined} onChange={(e) => setDateUndetermined(e.target.checked)} />
                 <span className="body-sm">날짜 미정</span>
@@ -135,8 +143,9 @@ export default function InfoEditPage() {
         <div style={{ marginTop: 'var(--sp-6)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button className="btn btn-secondary" onClick={() => navigate(`/projects/${id}/dashboard`)}>취소</button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--sp-3)' }}>
-            {savedAt && <span className="caption">저장됨 · {savedAt}</span>}
-            <button className="btn btn-primary" disabled={save.isPending} onClick={() => save.mutate()}>저장</button>
+            {saveError && <span className="caption" style={{ color: 'var(--error)' }}>{saveError}</span>}
+            <button className="btn btn-primary" disabled={save.isPending}
+                    onClick={() => { setSaveError(null); save.mutate(); }}>{save.isPending ? '저장 중…' : '저장'}</button>
           </div>
         </div>
       </div>
