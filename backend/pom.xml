@@ -73,6 +73,21 @@
       <artifactId>metadata-extractor</artifactId>
       <version>2.19.0</version>
     </dependency>
+    <!-- 운영 파일 저장(S3, docs/09) — HTTP 클라이언트는 가벼운 url-connection만 쓴다 -->
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>s3</artifactId>
+      <version>2.28.29</version>
+      <exclusions>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>netty-nio-client</artifactId></exclusion>
+        <exclusion><groupId>software.amazon.awssdk</groupId><artifactId>apache-client</artifactId></exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>url-connection-client</artifactId>
+      <version>2.28.29</version>
+    </dependency>
     <!-- 포스터 PDF 업로드: 텍스트(문구·폰트·위치) 추출, 글자 포함/제외 렌더링(docs/09 PDFBox) -->
     <dependency>
       <groupId>org.apache.pdfbox</groupId>
@@ -105,6 +120,16 @@
 
   <build>
     <finalName>actset</finalName>
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+      </resource>
+      <!-- 프런트 빌드(npm run build → frontend/dist)를 jar의 static/에 내장(docs/09). dist가 없으면 건너뛴다 -->
+      <resource>
+        <directory>../frontend/dist</directory>
+        <targetPath>static</targetPath>
+      </resource>
+    </resources>
     <plugins>
       <plugin>
         <groupId>org.springframework.boot</groupId>

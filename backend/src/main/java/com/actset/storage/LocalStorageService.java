@@ -1,34 +1,28 @@
 package com.actset.storage;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.Base64;
-import java.util.HexFormat;
 
 /**
- * 로컬 파일시스템 기반 StorageService (S3 대체, 개발용).
+ * 로컬 파일시스템 기반 StorageService (개발용, 기본값). 운영은 actset.storage.type=s3 → S3StorageService.
  * 저장 위치는 actset.storage.root — .gitignore의 storage/ 규칙과 일치한다(docs/09 파일 저장 구조).
  */
 @Service
-public class LocalStorageService implements StorageService {
+@ConditionalOnProperty(name = "actset.storage.type", havingValue = "local", matchIfMissing = true)
+public class LocalStorageService extends SignedUrlStorage {
 
     private final Path root;
-    private final String signingSecret;
 
     public LocalStorageService(@Value("${actset.storage.root:../storage}") String root,
                                 @Value("${actset.storage.signing-secret:dev-only-signing-secret-change-in-prod}") String signingSecret) {
+        super(signingSecret);
         this.root = Path.of(root).toAbsolutePath().normalize();
-        this.signingSecret = signingSecret;
         try {
             Files.createDirectories(this.root);
         } catch (IOException e) {
@@ -75,36 +69,6 @@ public class LocalStorageService implements StorageService {
             Files.deleteIfExists(resolve(relativePath));
         } catch (IOException e) {
             throw new UncheckedIOException(e);
-        }
-    }
-
-    @Override
-    public String signedUrl(String relativePath, Duration ttl) {
-        long exp = Instant.now().plus(ttl).getEpochSecond();
-        String sig = sign(relativePath, exp);
-        String encodedPath = Base64.getUrlEncoder().withoutPadding()
-                .encodeToString(relativePath.getBytes(StandardCharsets.UTF_8));
-        return "/api/v1/files/" + encodedPath + "?exp=" + exp + "&sig=" + sig;
-    }
-
-    @Override
-    public boolean verifySignature(String relativePath, long expiresEpochSeconds, String signature) {
-        if (Instant.now().getEpochSecond() > expiresEpochSeconds) {
-            return false;
-        }
-        String expected = sign(relativePath, expiresEpochSeconds);
-        return java.security.MessageDigest.isEqual(
-                expected.getBytes(StandardCharsets.UTF_8), signature.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private String sign(String relativePath, long exp) {
-        try {
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(signingSecret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-            byte[] raw = mac.doFinal((relativePath + ":" + exp).getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(raw);
-        } catch (Exception e) {
-            throw new IllegalStateException(e);
         }
     }
 }
