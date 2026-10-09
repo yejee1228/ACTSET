@@ -115,6 +115,20 @@ export interface JobStatus {
   status: 'pending' | 'running' | 'succeeded' | 'failed' | 'canceled';
   error: string | null;
   result: { asset_ids?: string[] } | null;
+  /** 진행 단계(진행 바) — 핸들러가 단계를 시작할 때 기록. 단계 안 진행률은 expected_sec로 추정한다 */
+  stage?: JobStage | null;
+  /** 하위 작업(규격별 변환)이 있는 묶음 작업의 완료 수 */
+  progress?: { done: number; total: number };
+}
+
+export interface JobStage {
+  step: number;
+  total: number;
+  label: string;
+  from: number;
+  to: number;
+  expected_sec: number;
+  started_at: string;
 }
 
 export interface AssetItem {

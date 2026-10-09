@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { DATE_INPUT_MAX, DATE_INPUT_MIN } from '../lib/dateInput';
 import { Header } from '../components/Header';
 import { api, ProjectDetail } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
@@ -130,6 +131,7 @@ export default function Step1InfoPage() {
             <div style={{ display: 'flex', gap: 'var(--sp-3)', alignItems: 'center' }}>
               <input
                 id="date" type="date" className="input" value={date ?? ''} disabled={dateUndetermined}
+                min={DATE_INPUT_MIN} max={DATE_INPUT_MAX}
                 onChange={(e) => setDate(e.target.value)}
                 onBlur={() => patch({ sessions: [{ date, is_undetermined: dateUndetermined }] })}
               />

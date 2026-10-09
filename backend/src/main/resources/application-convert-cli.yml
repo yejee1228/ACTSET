@@ -1,0 +1,4 @@
+# 규격변환 실API 테스트 실행기(ConversionTestRunner) 전용 — 웹 서버 없이 한 번 돌고 끝난다.
+spring:
+  main:
+    web-application-type: none

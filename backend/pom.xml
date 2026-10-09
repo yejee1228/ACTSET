@@ -73,6 +73,12 @@
       <artifactId>metadata-extractor</artifactId>
       <version>2.19.0</version>
     </dependency>
+    <!-- 포스터 PDF 업로드: 텍스트(문구·폰트·위치) 추출, 글자 포함/제외 렌더링(docs/09 PDFBox) -->
+    <dependency>
+      <groupId>org.apache.pdfbox</groupId>
+      <artifactId>pdfbox</artifactId>
+      <version>3.0.3</version>
+    </dependency>
 
     <dependency>
       <groupId>org.projectlombok</groupId>

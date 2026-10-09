@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
+import { JobProgressBar } from '../components/JobProgressBar';
 import { api, ApiError, AssetItem, JobStatus } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
 
@@ -15,6 +16,7 @@ export default function Step3DraftSelectionPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [jobStatus, setJobStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
+  const [runningJob, setRunningJob] = useState<JobStatus | null>(null); // 진행 바용 최신 작업 상태
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const startedRef = useRef(false);
 
@@ -51,9 +53,11 @@ export default function Step3DraftSelectionPage() {
 
   async function pollJob(jobId: string) {
     setJobStatus('running');
+    setRunningJob(null);
     for (let i = 0; i < 60; i++) {
       await new Promise((r) => setTimeout(r, 2500));
       const job = await api.get<JobStatus>(`/jobs/${jobId}`);
+      setRunningJob(job);
       if (job.status === 'succeeded') {
         setJobStatus('done');
         await refetchAssets();
@@ -148,6 +152,11 @@ export default function Step3DraftSelectionPage() {
           </div>
         )}
 
+        {showLoadingBoxes && (
+          <div style={{ marginBottom: 'var(--sp-4)' }}>
+            <JobProgressBar status={runningJob?.status} stage={runningJob?.stage} waitingLabel="시안 생성을 준비하는 중" />
+          </div>
+        )}
         {showLoadingBoxes && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--sp-4)' }}>
             {[0, 1, 2].map((i) => (

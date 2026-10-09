@@ -22,6 +22,8 @@ import AdminPage from './pages/AdminPage';
 import GalleryListPage from './pages/GalleryListPage';
 import GalleryDetailPage from './pages/GalleryDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
+import NewProjectPage from './pages/NewProjectPage';
+import PosterUploadPage from './pages/PosterUploadPage';
 import { RequireAuth } from './components/RequireAuth';
 import { MaintenanceBanner } from './components/MaintenanceBanner';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -45,6 +47,8 @@ export default function App() {
         <Route path="/support" element={<RequireAuth><SupportPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminPage /></RequireAuth>} />
 
+        <Route path="/projects/new" element={<RequireAuth><NewProjectPage /></RequireAuth>} />
+        <Route path="/projects/:id/upload-poster" element={<RequireAuth><PosterUploadPage /></RequireAuth>} />
         <Route path="/projects/:id/info" element={<RequireAuth><Step1InfoPage /></RequireAuth>} />
         <Route path="/projects/:id/additional" element={<RequireAuth><Step2AdditionalInfoPage /></RequireAuth>} />
         <Route path="/projects/:id/drafts" element={<RequireAuth><Step3DraftSelectionPage /></RequireAuth>} />

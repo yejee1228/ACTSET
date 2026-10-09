@@ -12,6 +12,7 @@ interface ProjectListItem {
   date_undetermined: boolean;
   thumbnail_url: string | null;
   updated_at: string;
+  source: string | null;
 }
 
 /** 0-B 홈 대시보드(1-6). active 프로젝트만 노출, 빈 상태·검색을 지원한다(docs/04). */
@@ -32,10 +33,8 @@ export default function HomePage() {
     queryFn: () => api.get<{ items: ProjectListItem[] }>('/projects?status=draft'),
   });
 
-  const createProject = useMutation({
-    mutationFn: () => api.post<{ id: string }>('/projects'),
-    onSuccess: (project) => navigate(`/projects/${project.id}/info`),
-  });
+  // 시작 방법(AI로 만들기 / 가지고 있는 포스터로 시작)은 선택 화면에서 고른다
+  const createProject = { mutate: () => navigate('/projects/new'), isPending: false };
 
   const deleteProject = useMutation({
     mutationFn: (id: string) => api.del(`/projects/${id}`),
@@ -62,8 +61,22 @@ export default function HomePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 'var(--sp-4)' }}>
               {draftItems.map((p) => (
                 <div key={p.id} className="card" style={{ overflow: 'hidden', position: 'relative', cursor: 'pointer' }}
-                     onClick={() => navigate(`/projects/${p.id}/info`)}>
+                     onClick={() => navigate(p.source === 'uploaded_poster' ? `/projects/${p.id}/upload-poster` : `/projects/${p.id}/info`)}>
                   <span className="badge badge-neutral" style={{ position: 'absolute', top: 8, left: 8, zIndex: 1 }}>작성 중</span>
+                  <button
+                    className="btn btn-destructive btn-sm"
+                    style={{ position: 'absolute', top: 6, right: 6, zIndex: 1 }}
+                    aria-label={`'${p.main_title || '제목 없음'}' 작성 중인 프로젝트 삭제`}
+                    disabled={deleteProject.isPending}
+                    onClick={(e) => {
+                      e.stopPropagation(); // 카드 클릭(이어서 작성)과 분리
+                      if (confirm(`작성 중인 '${p.main_title || '제목 없음'}' 프로젝트를 삭제할까요? 30일간 복구할 수 있습니다.`)) {
+                        deleteProject.mutate(p.id);
+                      }
+                    }}
+                  >
+                    삭제
+                  </button>
                   <div style={{
                     aspectRatio: '3 / 4', background: p.thumbnail_url ? `url(${p.thumbnail_url}) center/cover` : 'var(--bg-hover)',
                   }} />

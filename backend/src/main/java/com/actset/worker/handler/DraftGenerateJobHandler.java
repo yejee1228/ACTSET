@@ -20,6 +20,7 @@ import com.actset.repository.UploadedFileRepository;
 import com.actset.service.GeneratedAssetService;
 import com.actset.storage.StorageService;
 import com.actset.worker.JobHandler;
+import com.actset.worker.JobService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -59,6 +60,7 @@ public class DraftGenerateJobHandler implements JobHandler {
     private final PhotoLayerRenderer photoLayerRenderer;
     private final GeneratedAssetService generatedAssetService;
     private final ObjectMapper objectMapper;
+    private final JobService jobService;
 
     public DraftGenerateJobHandler(ProjectRepository projectRepository,
                                     UploadedFileRepository uploadedFileRepository,
@@ -70,7 +72,9 @@ public class DraftGenerateJobHandler implements JobHandler {
                                     PosterTextRenderer posterTextRenderer,
                                     PhotoLayerRenderer photoLayerRenderer,
                                     GeneratedAssetService generatedAssetService,
-                                    ObjectMapper objectMapper) {
+                                    ObjectMapper objectMapper,
+                                    JobService jobService) {
+        this.jobService = jobService;
         this.projectRepository = projectRepository;
         this.uploadedFileRepository = uploadedFileRepository;
         this.generatedAssetRepository = generatedAssetRepository;
@@ -133,6 +137,9 @@ public class DraftGenerateJobHandler implements JobHandler {
         ArrayNode candidateIds = objectMapper.createArrayNode();
 
         for (int i = 0; i < count; i++) {
+            // 진행 바: 시안 1장 = 1단계(프롬프트 다듬기 + 이미지 생성 + 텍스트 합성). 예상 12초는 추정치
+            jobService.progress(job.getId(), i + 1, count, "시안 " + (i + 1) + "/" + count + " 만드는 중",
+                    i * 100 / count, (i + 1) * 100 / count, 12);
             ImageGenerationRequest request = promptBuilder.build(info, referenceImagePaths, width, height,
                     referencePalette, mode, referenceSeed, referenceStyle);
             ImageGenerationResult generated = imageGenerationAdapter.generate(request);

@@ -32,3 +32,6 @@ tools/
 
 # 프런트 빌드 산출물이 백엔드 static/으로 복사되기 전 중간 산출물
 frontend/dist/
+
+# 폰트 대조 PoC용 후보 폰트(OFL, 대용량 — 스크립트가 내려받음)
+poc/fonts/

@@ -75,6 +75,26 @@ public class JobService {
         return jobRepository.recoverStale(threshold);
     }
 
+    /**
+     * 진행 단계 기록(진행 바). 핸들러가 단계를 시작할 때 부른다. 즉시 커밋되도록 트랜잭션 밖에서 바로 UPDATE한다.
+     *
+     * @param from        이 단계가 시작하는 전체 진행률(%)
+     * @param to          이 단계가 끝나는 전체 진행률(%)
+     * @param expectedSec 이 단계의 예상 소요 시간 — 화면이 단계 안에서 추정 진행률을 그리는 데 쓴다(실측 아님)
+     */
+    public void progress(UUID jobId, int step, int total, String label, int from, int to, int expectedSec) {
+        ObjectNode p = objectMapper.createObjectNode();
+        p.put("step", step);
+        p.put("total", total);
+        p.put("label", label);
+        p.put("from", from);
+        p.put("to", to);
+        p.put("expected_sec", expectedSec);
+        p.put("started_at", Instant.now().toString());
+        jdbcClient.sql("UPDATE jobs SET progress = CAST(:p AS jsonb), updated_at = now() WHERE id = :id")
+                .param("p", p.toString()).param("id", jobId).update();
+    }
+
     @Transactional
     public void markSucceeded(UUID jobId, ObjectNode result) {
         Job job = jobRepository.findById(jobId).orElseThrow();

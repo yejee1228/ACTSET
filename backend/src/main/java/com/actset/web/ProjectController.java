@@ -1,5 +1,8 @@
 package com.actset.web;
 
+import com.actset.conversion.PosterUploadService;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.actset.domain.GeneratedAsset;
 import com.actset.domain.Project;
 import com.actset.repository.GeneratedAssetRepository;
@@ -27,6 +30,7 @@ import java.util.UUID;
 @RequestMapping("/api/v1/projects")
 public class ProjectController {
 
+    private final PosterUploadService posterUploadService;
     private final ProjectService projectService;
     private final ProjectInfoService projectInfoService;
     private final ConfirmService confirmService;
@@ -37,7 +41,9 @@ public class ProjectController {
     public ProjectController(ProjectService projectService, ProjectInfoService projectInfoService,
                               ConfirmService confirmService, com.actset.repository.ProjectRepository projectRepository,
                               GeneratedAssetRepository generatedAssetRepository,
-                              GeneratedAssetService generatedAssetService) {
+                              GeneratedAssetService generatedAssetService,
+                              PosterUploadService posterUploadService) {
+        this.posterUploadService = posterUploadService;
         this.projectService = projectService;
         this.projectInfoService = projectInfoService;
         this.confirmService = confirmService;
@@ -46,9 +52,12 @@ public class ProjectController {
         this.generatedAssetService = generatedAssetService;
     }
 
+    /** mode=upload: "가지고 있는 포스터로 시작"(docs/03 U-1) — 업로드 경로 표시가 붙은 draft. 기본은 AI 생성 경로(①). */
     @PostMapping
-    public ResponseEntity<Map<String, Object>> create() {
-        Project project = projectService.createDraft(CurrentUser.id());
+    public ResponseEntity<Map<String, Object>> create(@RequestParam(required = false) String mode) {
+        Project project = "upload".equals(mode)
+                ? posterUploadService.createUploadDraft(CurrentUser.id())
+                : projectService.createDraft(CurrentUser.id());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("id", project.getId().toString());
         body.put("status", project.getStatus());
@@ -85,8 +94,12 @@ public class ProjectController {
             m.put("date_undetermined", p.isDateUndetermined());
             Optional<GeneratedAsset> poster = generatedAssetRepository
                     .findFirstByProjectIdAndCategoryAndDeletedAtIsNull(p.getId(), "포스터");
-            m.put("thumbnail_url", poster.map(a -> generatedAssetService.toSignedUrl(a.getPreviewImageUrl())).orElse(null));
+            // 대표 포스터가 없으면 업로드 원본으로(방어 — 없앤 /convert 경로로 만든 프로젝트처럼 결과물이 빠진 경우)
+            String fallback = p.getDesignAssets() != null ? p.getDesignAssets().path("source_poster").asText(null) : null;
+            m.put("thumbnail_url", poster.map(a -> generatedAssetService.toSignedUrl(a.getPreviewImageUrl()))
+                    .orElse(fallback != null ? generatedAssetService.toSignedUrl(fallback) : null));
             m.put("updated_at", p.getUpdatedAt().toString());
+            m.put("source", p.getDesignAssets() != null ? p.getDesignAssets().path("source").asText(null) : null);
             return m;
         }).toList();
 
@@ -144,6 +157,19 @@ public class ProjectController {
     }
 
     /** 7-2 Gallery 공개 전환(Stage 2·4·11·17). active가 아니면 409. */
+    /** U-1 포스터 업로드 — 대표 포스터 등록 + 포스터 분석 작업 등록(docs/11). 다시 올리면 교체. */
+    @PostMapping("/{id}/poster")
+    public ResponseEntity<Map<String, Object>> uploadPoster(@PathVariable UUID id,
+                                                            @RequestParam("poster") MultipartFile poster,
+                                                            @RequestParam("main_title") String mainTitle) {
+        PosterUploadService.Uploaded r = posterUploadService.upload(id, CurrentUser.id(), poster, mainTitle);
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("project_id", r.projectId().toString());
+        body.put("job_id", r.jobId().toString());
+        body.put("credit_cost", r.cost());
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(body);
+    }
+
     @PostMapping("/{id}/visibility")
     public Map<String, Object> setVisibility(@PathVariable UUID id, @RequestBody VisibilityRequest req) {
         Project project = projectService.setVisibility(id, CurrentUser.id(), req.visibility());
