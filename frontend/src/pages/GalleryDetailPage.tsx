@@ -40,6 +40,22 @@ export default function GalleryDetailPage() {
     );
   }
 
+  const detail = data.detail ?? null;
+  const period = !data.primary_date ? '-'
+    : !data.end_date || data.end_date === data.primary_date ? data.primary_date
+    : `${data.primary_date} ~ ${data.end_date}`;
+  const rows = ([
+    ['공연 시간', detail?.schedule],
+    ['러닝타임', detail?.runtime],
+    ['관람 연령', detail?.age],
+    ['티켓 가격', detail?.price],
+    ['출연', detail?.cast],
+    ['제작', detail?.producer],
+    ['주최', detail?.host],
+    ['주관', detail?.organizer],
+    ['지역', data.area],
+  ] as [string, string | null | undefined][]).filter((r): r is [string, string] => !!r[1]);
+
   return (
     <div>
       <Header />
@@ -49,7 +65,8 @@ export default function GalleryDetailPage() {
         </button>
 
         {data.poster_preview_url ? (
-          <img src={data.poster_preview_url} alt={data.main_title} style={{ width: '100%', borderRadius: 'var(--r-xl)', marginBottom: 'var(--sp-5)' }} />
+          <img src={data.poster_preview_url} alt={data.main_title} referrerPolicy="no-referrer"
+               style={{ width: '100%', borderRadius: 'var(--r-xl)', marginBottom: 'var(--sp-5)' }} />
         ) : (
           <div style={{ aspectRatio: '3/4', background: 'var(--bg-hover)', borderRadius: 'var(--r-xl)', marginBottom: 'var(--sp-5)' }} />
         )}
@@ -61,8 +78,41 @@ export default function GalleryDetailPage() {
         )}
         <h1 className="h1" style={{ marginBottom: 'var(--sp-2)' }}>{data.main_title}</h1>
         <p className="body-sm" style={{ marginBottom: 'var(--sp-6)', color: 'var(--gray-warm)' }}>
-          {data.genre ?? '-'} · {data.primary_date ?? '-'} · {data.venue_name ?? '장소 미정'}
+          {data.kopis_genre ?? data.genre ?? '-'} · {period} · {data.venue_name ?? '장소 미정'}
+          {data.state && <> · {data.state}</>}
         </p>
+
+        {rows.length > 0 && (
+          <dl className="card" style={{ padding: 'var(--sp-4)', marginBottom: 'var(--sp-6)', display: 'grid',
+                                        gridTemplateColumns: 'max-content 1fr', columnGap: 'var(--sp-4)', rowGap: 'var(--sp-2)' }}>
+            {rows.map(([k, v]) => (
+              <div key={k} style={{ display: 'contents' }}>
+                <dt className="body-sm" style={{ color: 'var(--gray-warm)' }}>{k}</dt>
+                <dd className="body-sm" style={{ margin: 0, whiteSpace: 'pre-line' }}>{v}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {detail && detail.ticketLinks.length > 0 && (
+          <div style={{ display: 'flex', gap: 'var(--sp-2)', flexWrap: 'wrap', marginBottom: 'var(--sp-6)' }}>
+            {detail.ticketLinks.map((l) => (
+              <a key={l.url} href={l.url} target="_blank" rel="noopener noreferrer" className="btn btn-secondary btn-sm">
+                {l.name ?? '예매하기'} ↗
+              </a>
+            ))}
+          </div>
+        )}
+
+        {detail && detail.introImages.length > 0 && (
+          <div style={{ marginBottom: 'var(--sp-6)' }}>
+            {detail.introImages.map((u) => (
+              <img key={u} src={u} alt="공연 소개" loading="lazy" referrerPolicy="no-referrer"
+                   style={{ width: '100%', display: 'block', marginBottom: 'var(--sp-2)', borderRadius: 'var(--r-md)' }}
+                   onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            ))}
+          </div>
+        )}
 
         {data.source === 'self' ? (
           <>
@@ -79,9 +129,14 @@ export default function GalleryDetailPage() {
             )}
           </>
         ) : (
-          <p className="caption" style={{ color: 'var(--gray-warm)' }}>
-            KOPIS 제공 공연은 공연 정보만 있어 디자인 스타일을 참고할 수 없습니다.
-          </p>
+          <>
+            <p className="caption" style={{ color: 'var(--gray-warm)' }}>
+              KOPIS 제공 공연은 공연 정보만 있어 디자인 스타일을 참고할 수 없습니다.
+            </p>
+            <p className="caption" style={{ color: 'var(--gray-warm)', marginTop: 'var(--sp-2)' }}>
+              공연 정보 출처: KOPIS(공연예술통합전산망, www.kopis.or.kr)
+            </p>
+          </>
         )}
       </div>
     </div>

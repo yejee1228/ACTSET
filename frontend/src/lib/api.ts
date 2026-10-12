@@ -96,7 +96,31 @@ export interface GalleryItem {
   main_title: string;
   genre: string | null;
   primary_date: string | null;
+  end_date: string | null;
+  venue_name: string | null;
   thumbnail_url: string | null;
+}
+
+export interface GalleryPage {
+  items: GalleryItem[];
+  next_offset: number | null;
+}
+
+/** KOPIS 상세 API 항목(백엔드 KopisDetail). 값은 KOPIS 원문. */
+export interface KopisDetail {
+  cast: string | null;
+  crew: string | null;
+  runtime: string | null;
+  age: string | null;
+  producer: string | null;
+  host: string | null;
+  organizer: string | null;
+  price: string | null;
+  schedule: string | null;
+  synopsis: string | null;
+  childFriendly: boolean;
+  introImages: string[];
+  ticketLinks: { name: string | null; url: string }[];
 }
 
 export interface GalleryDetail {
@@ -107,6 +131,11 @@ export interface GalleryDetail {
   primary_date: string | null;
   venue_name: string | null;
   poster_preview_url: string | null;
+  end_date?: string | null;
+  state?: string | null;
+  area?: string | null;
+  kopis_genre?: string | null;
+  detail?: KopisDetail | null;
 }
 
 export interface JobStatus {

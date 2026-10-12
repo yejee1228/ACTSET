@@ -2,13 +2,21 @@ package com.actset.external.kopis;
 
 import java.time.LocalDate;
 
-/** KOPIS 공연목록 API 응답 1건을 옮긴 것(docs/14 1-4, 확인필요 — 실제 필드명 재검증 필요). */
+/**
+ * KOPIS 공연목록 API 응답 1건(pblprfr → db). 태그: mt20id·prfnm·genrenm·prfpdfrom·prfpdto·fcltynm·poster·area·prfstate·openrun.
+ *
+ * @param state 공연예정 | 공연중 | 공연완료 (KOPIS 원문)
+ */
 public record KopisPerformance(
         String externalId,
         String title,
         String genre,
         LocalDate startDate,
+        LocalDate endDate,
         String venueName,
-        String posterUrl
+        String posterUrl,
+        String area,
+        String state,
+        boolean openRun
 ) {
 }

@@ -4,6 +4,7 @@ import com.actset.common.ApiException;
 import com.actset.domain.GeneratedAsset;
 import com.actset.domain.PerformanceSeed;
 import com.actset.domain.Project;
+import com.actset.external.kopis.KopisGenres;
 import com.actset.repository.GeneratedAssetRepository;
 import com.actset.repository.PerformanceSeedRepository;
 import com.actset.repository.ProjectRepository;
@@ -14,7 +15,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +37,8 @@ public class GalleryController {
     private final GeneratedAssetRepository generatedAssetRepository;
     private final GeneratedAssetService generatedAssetService;
     private final PerformanceSeedRepository performanceSeedRepository;
+    /** 목록 앞에 붙이는 자체 공개 프로젝트 최대 수. */
+    static final int SELF_CAP = 200;
 
     public GalleryController(ProjectRepository projectRepository, GeneratedAssetRepository generatedAssetRepository,
                               GeneratedAssetService generatedAssetService,
@@ -47,52 +49,60 @@ public class GalleryController {
         this.performanceSeedRepository = performanceSeedRepository;
     }
 
+    /**
+     * 자체 공개 프로젝트를 먼저, 이어서 끝나지 않은 KOPIS 공연(공연중 → 공연예정 순)을 이어 붙인 목록의 offset~offset+limit.
+     * 자체 공개 프로젝트는 아직 적어서(초기 부트스트래핑 단계) 한 번에 SELF_CAP건까지만 앞에 둔다.
+     */
     @GetMapping
     public Map<String, Object> list(@RequestParam(required = false) String genre,
-                                      @RequestParam(defaultValue = "20") int limit) {
-        int capped = Math.min(limit, 50);
-        var pageable = PageRequest.of(0, capped, Sort.by(Sort.Direction.DESC, "publishedAt"));
-        var projectPage = (genre == null || genre.isBlank())
-                ? projectRepository.findByVisibilityAndStatusOrderByPublishedAtDesc("public", "active", pageable)
-                : projectRepository.findByVisibilityAndStatusAndGenreOrderByPublishedAtDesc("public", "active", genre, pageable);
-
-        var seedPageable = PageRequest.of(0, capped, Sort.by(Sort.Direction.DESC, "primaryDate"));
-        var seedPage = (genre == null || genre.isBlank())
-                ? performanceSeedRepository.findAllByOrderByPrimaryDateDesc(seedPageable)
-                : performanceSeedRepository.findByGenreOrderByPrimaryDateDesc(genre, seedPageable);
+                                      @RequestParam(defaultValue = "24") int limit,
+                                      @RequestParam(defaultValue = "0") int offset) {
+        int capped = Math.max(1, Math.min(limit, 60));
+        int from = Math.max(0, offset);
+        boolean anyGenre = genre == null || genre.isBlank();
+        var selfPage = PageRequest.of(0, SELF_CAP, Sort.by(Sort.Direction.DESC, "publishedAt"));
+        List<Project> self = (anyGenre
+                ? projectRepository.findByVisibilityAndStatusOrderByPublishedAtDesc("public", "active", selfPage)
+                : projectRepository.findByVisibilityAndStatusAndGenreOrderByPublishedAtDesc("public", "active", genre, selfPage))
+                .getContent();
 
         List<Map<String, Object>> items = new ArrayList<>();
-        projectPage.getContent().forEach(p -> {
+        for (int i = from; i < self.size() && items.size() < capped; i++) {
+            Project p = self.get(i);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("project_id", p.getId().toString());
             m.put("source", "self");
             m.put("main_title", p.getMainTitle());
             m.put("genre", p.getGenre());
             m.put("primary_date", p.getPrimaryDate() != null ? p.getPrimaryDate().toString() : null);
+            m.put("end_date", null);
+            m.put("venue_name", p.getPerformanceInfo().path("venue").path("name").asText(null));
             m.put("thumbnail_url", posterPreviewUrl(p.getId()));
-            m.put("_sortDate", p.getPrimaryDate());
             items.add(m);
-        });
-        seedPage.getContent().forEach(s -> {
+        }
+        int seedOffset = Math.max(0, from - self.size()), seedLimit = capped - items.size();
+        boolean kids = KopisGenres.KIDS.equals(genre);
+        // 한 건 더 받아 다음 쪽이 있는지 본다
+        List<PerformanceSeed> seeds = performanceSeedRepository.findActive(LocalDate.now(),
+                anyGenre || kids ? null : genre, kids, seedLimit + 1, seedOffset);
+        boolean more = seeds.size() > seedLimit;
+        for (PerformanceSeed s : seeds.subList(0, Math.min(seedLimit, seeds.size()))) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("project_id", s.getId().toString());
             m.put("source", "kopis");
             m.put("main_title", s.getMainTitle());
             m.put("genre", s.getGenre());
             m.put("primary_date", s.getPrimaryDate() != null ? s.getPrimaryDate().toString() : null);
-            m.put("thumbnail_url", s.getPosterUrl());
-            m.put("_sortDate", s.getPrimaryDate());
+            m.put("end_date", s.getEndDate() != null ? s.getEndDate().toString() : null);
+            m.put("venue_name", s.getVenueName());
+            m.put("thumbnail_url", s.getThumbnailPath() != null
+                    ? generatedAssetService.toSignedUrl(s.getThumbnailPath()) : s.getPosterUrl());
             items.add(m);
-        });
-
-        items.sort(Comparator.comparing((Map<String, Object> m) -> (LocalDate) m.get("_sortDate"),
-                Comparator.nullsLast(Comparator.reverseOrder())));
-        items.forEach(m -> m.remove("_sortDate"));
-        List<Map<String, Object>> cappedItems = items.size() > capped ? items.subList(0, capped) : items;
+        }
 
         Map<String, Object> body = new LinkedHashMap<>();
-        body.put("items", cappedItems);
-        body.put("next_cursor", null);
+        body.put("items", items);
+        body.put("next_offset", more || from + items.size() < self.size() ? from + items.size() : null);
         return body;
     }
 
@@ -122,6 +132,12 @@ public class GalleryController {
         body.put("primary_date", seed.getPrimaryDate() != null ? seed.getPrimaryDate().toString() : null);
         body.put("venue_name", seed.getVenueName());
         body.put("poster_preview_url", seed.getPosterUrl());
+        body.put("end_date", seed.getEndDate() != null ? seed.getEndDate().toString() : null);
+        body.put("state", seed.getState());
+        body.put("area", seed.getArea());
+        body.put("kopis_genre", seed.getKopisGenre());
+        // 상세 API 항목(출연진·가격·소개 이미지·예매처). KOPIS가 공개한 정보이므로 그대로 보여 준다
+        body.put("detail", seed.getDetail());
         return body;
     }
 

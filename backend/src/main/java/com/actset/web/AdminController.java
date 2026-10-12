@@ -37,11 +37,16 @@ public class AdminController {
         this.performanceSeedService = performanceSeedService;
     }
 
-    /** 7-7(MVP 범위 밖) — KOPIS 최신 공연 N건을 Gallery 시드로 적재한다. 관리자 수동 실행. */
+    /**
+     * 7-7 — KOPIS 공연(공연중·공연예정)을 Gallery 시드로 적재한다. worker가 매일 자동으로 돌리며(KopisSyncScheduler),
+     * 이건 관리자가 바로 다시 받고 싶을 때 쓴다. 키가 없으면 목업 공연이 들어간다(live=false).
+     */
     @PostMapping("/kopis/sync")
-    public Map<String, Object> syncKopis(@RequestParam(defaultValue = "9") int count) throws Exception {
-        int synced = performanceSeedService.syncLatest(count);
-        return Map.of("synced", synced);
+    public Map<String, Object> syncKopis(@RequestParam(defaultValue = "500") int count) throws Exception {
+        PerformanceSeedService.SyncResult r = performanceSeedService.sync(Math.min(Math.max(count, 1), 2000));
+        return Map.of("live", performanceSeedService.live(), "listed", r.listed(), "saved", r.saved(),
+                "details_fetched", r.detailsFetched(), "thumbnails", r.thumbnails(),
+                "failures", r.failures(), "blocked", r.blocked(), "ms", r.ms());
     }
 
     @GetMapping("/accounts")

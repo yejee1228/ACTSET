@@ -55,6 +55,9 @@ public class SecurityConfig {
                         "/api/v1/auth/password-reset/request", "/api/v1/auth/password-reset/confirm").permitAll()
                 .requestMatchers("/api/v1/formats", "/api/v1/system/status", "/api/v1/funnel-events").permitAll()
                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/gallery/**", "/api/v1/gallery").permitAll()
+                // 서명 URL은 서명·만료가 곧 접근 권한이다(FileServingController가 검증, 규칙 7). 로그인 없이 보는 Gallery의
+                // 포스터·축소본도 이 URL이라 로그인을 요구하면 비로그인 방문자에게 이미지가 안 보인다
+                .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/files/**").permitAll()
                 .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/", "/index.html", "/assets/**", "/favicon.ico").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")

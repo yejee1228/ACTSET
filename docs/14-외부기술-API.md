@@ -72,18 +72,23 @@ ACTSET은 **자체 AI 모델을 만들지 않는다.** 모델은 사서 쓰고, 
 
 공연명이 바뀌면 안 되는 서비스이므로 두 규칙을 연동 코드에서 강제한다. 기본 모드(폰트 렌더링)가 있으므로 이 기능이 실패해도 서비스에 지장은 없다.
 
-### 1-4. 공공데이터 — KOPIS 공연예술통합전산망 (신규, Stage 17 — MVP 범위 아님)
+### 1-4. 공공데이터 — KOPIS 공연예술통합전산망 (Stage 17, 2026-10-11 연동)
 
-Gallery(DISCOVER) 초기 콘텐츠 부트스트래핑을 위한 시드 데이터 소스다(Stage 17 참고). **MVP 범위가 아니며 E7(Stage 13) 7-7 티켓에서 조사만 선행한다.**
+Gallery(DISCOVER) 초기 콘텐츠 부트스트래핑용 시드 데이터 소스다(Stage 17). 2026-10-11 실제 서비스키로 응답을 확인하고 연동했다(`RealKopisAdapter`, 키는 `KOPIS_SERVICE_KEY` 환경변수 — 없으면 목업).
 
 | 항목 | 내용 |
 |---|---|
-| 용도 | Gallery 초기 공연 정보(Performance Data만 — 디자인·레이아웃 데이터는 포함되지 않음) |
-| 제공처 | 공공데이터포털(data.go.kr)의 KOPIS(공연예술통합전산망) 공연정보 API |
-| 과금 | 공공데이터 API는 통상 무료이나 호출 한도가 있을 수 있음 — 확인필요 |
-| **확인 사항 (E0)** | 이용약관·재배포 조건, 데이터 갱신 주기, 호출 한도, 저작권·출처 표기 의무 |
+| 용도 | Gallery 공연 정보(Performance Data만 — 디자인·레이아웃 데이터는 없음) |
+| 제공처 | KOPIS 오픈API(www.kopis.or.kr) — 회원가입 후 오픈API 신청으로 서비스키 발급 |
+| 목록 | `GET https://www.kopis.or.kr/openApi/restful/pblprfr?service=&stdate=yyyyMMdd&eddate=yyyyMMdd&cpage=&rows=` → XML `dbs/db` (mt20id·prfnm·prfpdfrom·prfpdto·fcltynm·poster·area·genrenm·openrun·prfstate) |
+| 상세 | `GET .../pblprfr/{mt20id}?service=` → prfcast·prfcrew·prfruntime·prfage·entrpsnm(P/A/H/S)·pcseguidance·sty·child·dtguidance·styurls/styurl·relates/relate(relatenm·relateurl) |
+| 날짜 형식 | `2026.10.22` |
+| 이미지 | `http://www.kopis.or.kr/upload/...`로 온다. https는 `https://kopis.or.kr/`로 301 — 저장 시 그 주소로 바꾼다. 포스터 원본은 장당 약 3MB라 목록용 축소본(480px)을 저장소에 만든다 |
+| 갱신 | worker가 매일 04:00 KST, 오늘~90일 기간, 최대 500건(`actset.kopis.sync-max`). 상세는 7일마다 다시 받는다. 서버가 처음 뜰 때 실제 공연이 없으면 바로 한 번 받는다 |
+| 과금 | 무료. 호출 한도 — 확인필요 |
+| **확인 사항** | 이용약관의 재배포·이미지 사용(축소본 저장 포함)·출처 표기 문구, 호출 한도 |
 
-**출처 표기 의무가 있을 가능성이 높다.** Gallery에 KOPIS 시드 데이터를 노출할 때 "자체 등록"과 "KOPIS 제공" 공연을 구분 표시해야 할 수 있으며, 이는 G-1·G-2 화면 설계에도 영향을 준다(Stage 4). 실제 연동 착수 시점에 약관을 재확인하고 이 절을 갱신한다.
+Gallery 목록·상세에는 "KOPIS 제공" 표시와 "공연 정보 출처: KOPIS(공연예술통합전산망, www.kopis.or.kr)"를 넣었다. 약관이 정한 문구가 따로 있으면 그 문구로 바꾼다.
 
 ---
 
