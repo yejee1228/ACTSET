@@ -90,6 +90,32 @@ public class DesignElementStore {
         return out;
     }
 
+    /** 저장된 요소 전부(NOISE 포함)를 추출 결과 형태로 — 역할 재판정(ElementExtractionService.reclassify)용. key = 요소 id. */
+    @Transactional(readOnly = true)
+    public List<ElementExtractionService.Extracted> loadAll(UUID projectId) {
+        List<ElementExtractionService.Extracted> out = new ArrayList<>();
+        for (DesignElement d : repository.findByProjectIdOrderByLayerOrderAsc(projectId)) {
+            out.add(new ElementExtractionService.Extracted(d.getId().toString(), ElementRole.parse(d.getRole()), d.getOrigin(),
+                    d.getLabel(), read(d.getStoragePath()), new Rectangle(d.getX(), d.getY(), d.getWidth(), d.getHeight()),
+                    d.getLayerOrder(), d.getMeta() instanceof com.fasterxml.jackson.databind.node.ObjectNode o ? o : objectMapper.createObjectNode()));
+        }
+        return out;
+    }
+
+    /** 역할·설명·문구만 바꾼다(요소 파일은 그대로). 문구가 비면 meta.text를 지운다. */
+    @Transactional
+    public void relabel(UUID elementId, ElementRole role, String label, String text) {
+        DesignElement d = repository.findById(elementId).orElseThrow();
+        d.setRole(role.name());
+        d.setLabel(label);
+        com.fasterxml.jackson.databind.node.ObjectNode meta = d.getMeta() instanceof com.fasterxml.jackson.databind.node.ObjectNode o
+                ? o.deepCopy() : objectMapper.createObjectNode();
+        if (role.isText() && text != null && !text.isBlank()) meta.put("text", text);
+        else meta.remove("text");
+        d.setMeta(meta);
+        repository.save(d);
+    }
+
     private BufferedImage read(String path) {
         try {
             return ImageIO.read(new ByteArrayInputStream(storage.read(path)));

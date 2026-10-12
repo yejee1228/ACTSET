@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { api, AssetItem, ProjectDetail } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
 import { useDebouncedCallback } from '../lib/useDebouncedCallback';
+import { useSystemStatus } from '../lib/systemStatus';
 
 interface Warning { code: string; message: string }
 interface DraftResult { id: string; estimated_price: number; warnings: Warning[] }
@@ -19,6 +20,8 @@ const PRESETS = [
 export default function PrintPage() {
   const { id } = useParams<{ id: string }>();
   const [acknowledged, setAcknowledged] = useState(false);
+  const { data: status } = useSystemStatus();
+  const printEnabled = status?.print_enabled !== false;
 
   useEffect(() => { trackFunnelStep('print'); }, []);
 
@@ -65,7 +68,7 @@ export default function PrintPage() {
   });
 
   const debouncedRecalc = useDebouncedCallback(() => {
-    if (assetId) upsertDraft.mutate();
+    if (assetId && printEnabled) upsertDraft.mutate();
   }, 500);
 
   useEffect(() => {
@@ -74,6 +77,23 @@ export default function PrintPage() {
   }, [assetId, widthMm, heightMm, quantity, paper]);
 
   const needsScheduleWarning = project?.flags.date_undetermined || project?.flags.venue_undetermined;
+
+  if (!printEnabled) {
+    // 베타 기간 인쇄 끔(서버 actset.print.enabled=false). 주소로 직접 들어온 경우의 안내
+    return (
+      <div>
+        <Header />
+        <div className="page">
+          <div className="card" style={{ padding: 'var(--sp-10)', textAlign: 'center' }}>
+            <h1 className="h2" style={{ marginBottom: 'var(--sp-2)' }}>인쇄는 베타 이후에 열려요</h1>
+            <p className="body-sm" style={{ color: 'var(--gray-warm)' }}>
+              지금은 화면용 결과물(포스터·규격변환)만 만들 수 있습니다.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (needsScheduleWarning && !acknowledged) {
     return (

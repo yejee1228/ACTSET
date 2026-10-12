@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Map;
 
-/** 점검 배너(1-24). 운영 중 actset.maintenance.enabled=true로 켜면 프런트가 배너를 띄운다. */
+/** 점검 배너(1-24)·기능 켜짐 여부. 운영 중 actset.maintenance.enabled=true로 켜면 프런트가 배너를 띄운다. */
 @RestController
 public class SystemStatusController {
 
@@ -16,8 +16,12 @@ public class SystemStatusController {
     @Value("${actset.maintenance.message:서비스 점검 중입니다. 잠시 후 다시 시도해주세요.}")
     private String maintenanceMessage;
 
+    /** 인쇄 기능 켜짐 여부 — 프런트가 인쇄 버튼을 숨긴다(베타 기간 꺼 둠). */
+    @Value("${actset.print.enabled:true}")
+    private boolean printEnabled;
+
     @GetMapping("/api/v1/system/status")
     public Map<String, Object> status() {
-        return Map.of("maintenance", maintenanceEnabled, "message", maintenanceMessage);
+        return Map.of("maintenance", maintenanceEnabled, "message", maintenanceMessage, "print_enabled", printEnabled);
     }
 }

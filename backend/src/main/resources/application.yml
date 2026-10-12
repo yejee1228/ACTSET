@@ -38,6 +38,9 @@ management:
       show-details: never
 
 actset:
+  # 인쇄 기능(⑧). 베타 서버(t3.small, 메모리 2GB)는 인쇄 해상도 합성(X배너 한 장 약 4GB)을 못 버텨 끈다(2026-10-12 결정)
+  print:
+    enabled: ${ACTSET_PRINT_ENABLED:true}
   storage:
     root: ${STORAGE_ROOT:../storage}
   credit:

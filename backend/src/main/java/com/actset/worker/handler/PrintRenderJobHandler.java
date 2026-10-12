@@ -1,6 +1,7 @@
 package com.actset.worker.handler;
 
 import com.actset.common.ApiException;
+import com.actset.conversion.ConversionPrintService;
 import com.actset.domain.GeneratedAsset;
 import com.actset.domain.Job;
 import com.actset.domain.Project;
@@ -51,11 +52,14 @@ public class PrintRenderJobHandler implements JobHandler {
     private final PosterTextRenderer posterTextRenderer;
     private final PhotoLayerRenderer photoLayerRenderer;
     private final ObjectMapper objectMapper;
+    private final ConversionPrintService conversionPrint;
 
     public PrintRenderJobHandler(ProjectRepository projectRepository, GeneratedAssetRepository generatedAssetRepository,
                                   UploadedFileRepository uploadedFileRepository, StorageService storageService,
                                   PerformanceInfoTextMapper textMapper, PosterTextRenderer posterTextRenderer,
-                                  PhotoLayerRenderer photoLayerRenderer, ObjectMapper objectMapper) {
+                                  PhotoLayerRenderer photoLayerRenderer, ObjectMapper objectMapper,
+                                  ConversionPrintService conversionPrint) {
+        this.conversionPrint = conversionPrint;
         this.projectRepository = projectRepository;
         this.generatedAssetRepository = generatedAssetRepository;
         this.uploadedFileRepository = uploadedFileRepository;
@@ -86,6 +90,22 @@ public class PrintRenderJobHandler implements JobHandler {
 
         int printW = (int) Math.round(widthMm / 25.4 * dpi);
         int printH = (int) Math.round(heightMm / 25.4 * dpi);
+
+        if (ConversionPrintService.CATEGORY.equals(asset.getCategory())) {
+            // 규격변환 결과: 저장된 요소를 고해상도로 바꿔 같은 배치를 인쇄 크기로 다시 합성(2026-10-12).
+            // 이 결과물은 base_image가 없어 아래 시안 경로로는 인쇄할 수 없다
+            ConversionPrintService.Printed printed = conversionPrint.render(project, asset, printW, printH);
+            String path = "projects/" + project.getId() + "/print/" + job.getId() + ".jpg";
+            storageService.store(toJpeg(printed.image()), path, "image/jpeg");
+            ObjectNode result = objectMapper.createObjectNode();
+            result.put("image_url", storageService.signedUrl(path, Duration.ofHours(2)));
+            result.put("width", printW);
+            result.put("height", printH);
+            result.put("dpi", dpi);
+            result.put("upscale_factor", printed.upscaleFactor());
+            result.put("layout_variant", printed.variant());
+            return result;
+        }
 
         BufferedImage backdropSource = ImageIO.read(new ByteArrayInputStream(storageService.read(asset.getBaseImageUrl())));
         BufferedImage backdrop = ImageFit.coverFit(backdropSource, printW, printH);

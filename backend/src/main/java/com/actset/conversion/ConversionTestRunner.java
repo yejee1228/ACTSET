@@ -51,6 +51,7 @@ import java.util.UUID;
  * </pre>
  * --reuse: DB에 저장된 요소를 그대로 쓰고 분해·LLM을 다시 부르지 않는다(과금 없음).
  * --refs: 기준 이미지 폴더(파일명 = 5분류 한글명). 주면 (B) 기준 이미지 학습 규칙 렌더 + 기준 비교 평가를 한다.
+ * --print[=배율]: 인쇄 해상도 시험(초해상도 1회, 결과는 캐시). --no-eval: 기준 비교 그림만 만들고 LLM 평가는 하지 않는다. --reclassify: 저장된 요소의 역할만 LLM으로 다시 판정한다(1회).
  */
 @Component
 @Profile("convert-cli")
@@ -66,10 +67,15 @@ public class ConversionTestRunner implements ApplicationRunner {
     private final AccountRepository accounts;
     private final ProjectRepository projects;
     private final ObjectMapper objectMapper;
+    private final HiResElementService hiRes;
+    private final ConversionPrintService conversionPrint;
+    private final Map<FormatClass, com.actset.domain.GeneratedAsset> savedA = new EnumMap<>(FormatClass.class);
 
     public ConversionTestRunner(ElementExtractionService extraction, DesignElementStore store, FormatRenderService renderer,
                                 VisionAnalysisAdapter vision, AccountRepository accounts, ProjectRepository projects,
-                                ObjectMapper objectMapper) {
+                                ObjectMapper objectMapper, HiResElementService hiRes, ConversionPrintService conversionPrint) {
+        this.hiRes = hiRes;
+        this.conversionPrint = conversionPrint;
         this.extraction = extraction;
         this.store = store;
         this.renderer = renderer;
@@ -111,6 +117,22 @@ public class ConversionTestRunner implements ApplicationRunner {
         } else {
             summary.put("extraction", "reused (DB)");
         }
+        if (args.containsOption("reclassify")) {
+            // 역할 정의가 바뀌었을 때(2026-10-12 KEYWORD·CREDIT 추가) 저장된 요소의 역할만 다시 판정 — LLM 1회
+            long t0 = System.currentTimeMillis();
+            var labels = extraction.reclassify(poster, store.loadAll(project.getId()));
+            ArrayNode changes = summary.putArray("reclassified");
+            Map<String, String> before = new java.util.HashMap<>();
+            store.loadAll(project.getId()).forEach(e -> before.put(e.key(), e.role().name()));
+            labels.forEach((id, l) -> {
+                com.actset.conversion.layout.ElementRole role = com.actset.conversion.layout.ElementRole.parse(l.role());
+                store.relabel(UUID.fromString(id), role, l.label(), l.text());
+                changes.addObject().put("id", id).put("before", before.get(id)).put("after", role.name())
+                        .put("label", l.label()).put("text", l.text());
+            });
+            summary.put("reclassify_ms", System.currentTimeMillis() - t0);
+            log.info("역할 재판정: {}건 ({}ms)", labels.size(), System.currentTimeMillis() - t0);
+        }
         List<LayoutPlanner.SourceElement> elements = store.load(project.getId());
         summary.put("layout_elements", elements.size());
         int sw = poster.getWidth(), sh = poster.getHeight();
@@ -120,6 +142,8 @@ public class ConversionTestRunner implements ApplicationRunner {
         for (FormatClass c : FormatClass.values()) priorRules.put(c, TempLayoutPriors.forClass(c));
         Map<FormatClass, FormatRenderService.Rendered> setA = renderAll(account, project, sw, sh, elements, priorRules,
                 out, "A", summary.putObject("render_A_prior"));
+
+        if (args.containsOption("print")) printTest(args, poster, project, setA, out, summary.putObject("print"));
 
         if (refs == null) {
             write(out.resolve("summary.json"), summary);
@@ -155,13 +179,90 @@ public class ConversionTestRunner implements ApplicationRunner {
             ObjectNode node = compare.putObject(c.name());
             node.set("iou_A", iou(setA.get(c).plan(), refNotes.get(c)));
             node.set("iou_B", iou(setB.get(c).plan(), refNotes.get(c)));
-            VisionAnalysisAdapter.Evaluation ev = vision.evaluate(setA.get(c).image(), ExternalFit.fit(ref, 1600), c.label());
-            node.set("llm_eval_A", objectMapper.valueToTree(ev));
+            if (!args.containsOption("no-eval")) { // --no-eval: 비교 그림만 만들고 LLM 평가(규격당 1회)는 건너뜀
+                VisionAnalysisAdapter.Evaluation ev = vision.evaluate(setA.get(c).image(), ExternalFit.fit(ref, 1600), c.label());
+                node.set("llm_eval_A", objectMapper.valueToTree(ev));
+                log.info("비교 완료: {} {}", c, ev.scores());
+            }
             ImageIO.write(sideBySide(c, setA.get(c).image(), setB.get(c).image(), ref), "png",
                     out.resolve("compare_" + c.name() + ".png").toFile());
-            log.info("비교 완료: {} {}", c, ev.scores());
         }
         write(out.resolve("summary.json"), summary);
+    }
+
+    /**
+     * --print[=배율]: 인쇄 해상도 시험(2026-10-12). 고른 화면 배치를 X배너 600x1800mm·150dpi(3543x10630)와
+     * 정사각 300x300mm·300dpi(3543x3543)로 다시 합성한다. 요소는 HiResElementService로 만든 고해상도 판.
+     * 확대 포스터는 out/debug/hires_poster_x배율.png에 남겨 다시 돌릴 때 과금하지 않는다.
+     */
+    private void printTest(ApplicationArguments args, BufferedImage poster, Project project,
+                           Map<FormatClass, FormatRenderService.Rendered> setA, Path out, ObjectNode logNode) throws Exception {
+        List<String> v = args.getOptionValues("print");
+        double f = v == null || v.isEmpty() || v.get(0).isBlank() ? 4 : Double.parseDouble(v.get(0));
+        Path cache = out.resolve("debug").resolve("hires_poster_x" + (int) f + ".png");
+        BufferedImage cached = Files.exists(cache) ? ImageIO.read(cache.toFile()) : null;
+        Map<String, String> texts = new java.util.HashMap<>();
+        for (var e : store.loadAll(project.getId())) {
+            if (e.meta() != null && e.meta().hasNonNull("text")) texts.put(e.key(), e.meta().get("text").asText());
+        }
+        long t0 = System.currentTimeMillis();
+        HiResElementService.HiRes hr = hiRes.build(poster, store.load(project.getId()), f, texts, cached);
+        logNode.put("upscale_factor", f);
+        logNode.put("upscale_reused", cached != null);
+        logNode.put("hires_ms", System.currentTimeMillis() - t0);
+        if (cached == null) ImageIO.write(hr.upscaledPoster(), "png", cache.toFile());
+        ObjectNode methods = logNode.putObject("methods");
+        hr.method().forEach(methods::put);
+        for (Object[] job : new Object[][]{{FormatClass.LONG_PORTRAIT, 3543}, {FormatClass.SQUARE, 3543}}) {
+            FormatClass c = (FormatClass) job[0];
+            LayoutPlanner.Plan plan = setA.get(c).plan();
+            double k = (int) job[1] / (double) plan.width();
+            t0 = System.currentTimeMillis();
+            BufferedImage hi = renderer.renderScaled(plan, k, hr.images(), f);
+            BufferedImage naive = ImageOps.resize(setA.get(c).image(), hi.getWidth(), hi.getHeight()); // 지금 방식: 화면 결과를 키움
+            ObjectNode n = logNode.putObject(c.name());
+            n.put("size", hi.getWidth() + "x" + hi.getHeight());
+            n.put("render_ms", System.currentTimeMillis() - t0);
+            writeJpeg(hi, out.resolve("PRINT_" + c.name() + "_" + hi.getWidth() + "x" + hi.getHeight() + ".jpg"));
+            // 같은 자리를 100%로 잘라 비교: 머리글 / 아래쪽 정보
+            for (Object[] crop : new Object[][]{{"headline", plan.blockRects().get(com.actset.conversion.layout.LayoutBlock.HEADLINE)},
+                    {"credit", plan.blockRects().get(com.actset.conversion.layout.LayoutBlock.CREDIT)},
+                    {"keyvisual", plan.blockRects().get(com.actset.conversion.layout.LayoutBlock.KEYVISUAL)}}) {
+                Rectangle2D r = (Rectangle2D) crop[1];
+                if (r == null) continue;
+                int cw = Math.min(1400, (int) (r.getWidth() * k)), ch = Math.min(900, (int) (r.getHeight() * k));
+                int cx = (int) Math.max(0, Math.min(hi.getWidth() - cw, r.getCenterX() * k - cw / 2.0));
+                int cy = (int) Math.max(0, Math.min(hi.getHeight() - ch, r.getCenterY() * k - ch / 2.0));
+                BufferedImage pair = new BufferedImage(cw * 2 + 20, ch, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g = pair.createGraphics();
+                g.setColor(Color.WHITE);
+                g.fillRect(0, 0, pair.getWidth(), ch);
+                g.drawImage(naive.getSubimage(cx, cy, cw, ch), 0, 0, null);
+                g.drawImage(hi.getSubimage(cx, cy, cw, ch), cw + 20, 0, null);
+                g.dispose();
+                ImageIO.write(pair, "png", out.resolve("PRINT_" + c.name() + "_crop_" + crop[0] + ".png").toFile());
+            }
+            log.info("인쇄 시험 {}: {}", c, n);
+        }
+        if (args.containsOption("print-service")) {
+            // 운영 경로(⑧ render_print 작업이 부르는 서비스) 그대로 — 저장된 X배너 결과를 600x1800mm·150dpi로
+            t0 = System.currentTimeMillis();
+            ConversionPrintService.Printed p = conversionPrint.render(project, savedA.get(FormatClass.LONG_PORTRAIT), 3543, 10630);
+            ObjectNode n = logNode.putObject("service_LONG_PORTRAIT");
+            n.put("factor", p.upscaleFactor());
+            n.put("reused", p.upscaleReused());
+            n.put("variant", p.variant());
+            n.put("ms", System.currentTimeMillis() - t0);
+            writeJpeg(p.image(), out.resolve("PRINT_SERVICE_LONG_PORTRAIT.jpg"));
+        }
+    }
+
+    private static void writeJpeg(BufferedImage img, Path p) throws Exception {
+        BufferedImage rgb = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TYPE_INT_RGB);
+        Graphics2D g = rgb.createGraphics();
+        g.drawImage(img, 0, 0, null);
+        g.dispose();
+        ImageIO.write(rgb, "jpg", p.toFile());
     }
 
     /** 이전 실행이 남긴 분해 레이어(02_layer{i}_raw.png). 없으면 null → 분해 API 호출. */
@@ -186,11 +287,17 @@ public class ConversionTestRunner implements ApplicationRunner {
             FormatRenderService.Rendered r = renderer.render(sw, sh, elements, rules.get(c), preset.width(), preset.height());
             long ms = System.currentTimeMillis() - t0;
             var asset = renderer.save(account.getId(), project.getId(), preset.name(), r);
+            if ("A".equals(tag)) savedA.put(c, asset);
             Path file = out.resolve(tag + "_" + c.name() + "_" + preset.width() + "x" + preset.height() + ".png");
             ImageIO.write(r.image(), "png", file.toFile());
             ObjectNode n = logNode.putObject(c.name());
             n.put("format", preset.name() + " " + preset.width() + "x" + preset.height());
             n.put("rule_source", r.plan().rule().source());
+            n.put("variant", r.plan().variant());
+            n.put("score", r.plan().score());
+            n.set("score_parts", objectMapper.valueToTree(r.plan().scoreParts()));
+            ArrayNode alts = n.putArray("alternatives");
+            r.plan().alternatives().forEach(alts::add);
             n.put("render_ms", ms);
             n.put("file", file.getFileName().toString());
             n.put("db_asset_id", asset.getId().toString());

@@ -57,16 +57,22 @@ public class GptVisionAnalysisAdapter implements VisionAnalysisAdapter {
             - SUBJECT: key visual figures/objects (performer silhouette, big moon, main illustration objects)
             - DECOR: small decorative objects (stars, sparkles, small hats, butterflies, ornaments) that are not text
             - TITLE: the main performance title lettering (one or more pieces)
-            - COPY: tagline / subtitle / short promotional phrases near the title (including small English words)
-            - INFO: date, time, venue, organizer, age, price, contact lines
+            - COPY: a tagline / subtitle sentence or phrase that promotes the show (e.g. "빛과 그림자가 함께 하는 마술쇼")
+            - KEYWORD: decorative keywords or labels that are neither title nor tagline — single words used as
+              ornament, often English with tiny Korean glosses (e.g. "MAGIC", "SHADOW", "LASER", "마술 / MAGIC")
+            - INFO: information the audience must see — date, time, venue, price, booking
+            - CREDIT: fine-print lines — organizer/host (주최·주관·후원·협찬), contact (문의), age rating (관람연령),
+              copyright. If one line mixes INFO and CREDIT items, choose by what most of the line is
             - MARK: company/organizer logo
             - FRAME: border/frame lines or ornamental corners running along the canvas edges
             - NOISE: fragments, dust, duplicated partial copies, unusable pieces
             Also list text that is visible in the original poster but is NOT contained (fully readable) in any
             element — so we can typeset it again. Give its bbox relative to the original poster (0..1).
+            For text elements (TITLE, COPY, KEYWORD, INFO, CREDIT) also give "text": the exact characters shown in
+            that element, line breaks as \n (empty string for non-text elements).
             Return JSON only:
-            {"elements": [{"index": 1, "role": "TITLE", "label": "<short Korean description>"}, ...],
-             "missing_texts": [{"text": "...", "role": "TITLE|COPY|INFO", "bbox": [x0,y0,x1,y1],
+            {"elements": [{"index": 1, "role": "TITLE", "label": "<short Korean description>", "text": "..."}, ...],
+             "missing_texts": [{"text": "...", "role": "TITLE|COPY|KEYWORD|INFO|CREDIT", "bbox": [x0,y0,x1,y1],
                                 "color": "#RRGGBB", "bold": true}]}""";
 
     private static final String ANNOTATE_SYSTEM = """
@@ -128,7 +134,8 @@ public class GptVisionAnalysisAdapter implements VisionAnalysisAdapter {
                 List.of(poster, sheet));
         List<ElementLabel> labels = new ArrayList<>();
         for (JsonNode n : j.path("elements")) {
-            labels.add(new ElementLabel(n.path("index").asInt(), n.path("role").asText("NOISE"), n.path("label").asText("")));
+            labels.add(new ElementLabel(n.path("index").asInt(), n.path("role").asText("NOISE"), n.path("label").asText(""),
+                    n.path("text").asText("")));
         }
         List<MissingText> missing = new ArrayList<>();
         for (JsonNode n : j.path("missing_texts")) {

@@ -42,11 +42,23 @@ public class PrintController {
         this.objectMapper = objectMapper;
     }
 
+    @org.springframework.beans.factory.annotation.Value("${actset.print.enabled:true}")
+    private boolean printEnabled;
+
+    /** 베타 기간 인쇄 끔(actset.print.enabled=false) — 인쇄 해상도 합성은 메모리를 많이 써서 작은 서버에서 실패한다. */
+    static void requirePrintEnabled(boolean enabled) {
+        if (!enabled) {
+            throw new ApiException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "PRINT_DISABLED",
+                    "베타 기간에는 인쇄를 지원하지 않습니다.");
+        }
+    }
+
     public record PrintRenderRequest(UUID asset_id, int width_mm, int height_mm, Integer dpi) {
     }
 
     @PostMapping("/print-renders")
     public ResponseEntity<Map<String, Object>> requestPrintRender(@PathVariable UUID id, @RequestBody PrintRenderRequest req) {
+        requirePrintEnabled(printEnabled);
         projectService.getOwned(id, CurrentUser.id());
         GeneratedAsset asset = generatedAssetRepository.findById(req.asset_id())
                 .filter(a -> a.getProjectId().equals(id))
@@ -64,7 +76,9 @@ public class PrintController {
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("job_id", job.getId().toString());
-        if (asset.getWidth() < requiredPx * 0.9) {
+        // 규격변환 결과는 요소를 고해상도로 바꿔 다시 합성하므로(ConversionPrintService) 결과물 픽셀 수로 경고하지 않는다
+        boolean recomposed = com.actset.conversion.ConversionPrintService.CATEGORY.equals(asset.getCategory());
+        if (!recomposed && asset.getWidth() < requiredPx * 0.9) {
             body.put("warnings", java.util.List.of(Map.of(
                     "code", "LOW_RESOLUTION", "message", "원본 해상도가 낮아 인쇄 시 화질이 떨어질 수 있습니다.")));
         }
@@ -76,6 +90,7 @@ public class PrintController {
 
     @PostMapping("/print-drafts")
     public ResponseEntity<Map<String, Object>> createDraft(@PathVariable UUID id, @RequestBody PrintDraftRequest req) {
+        requirePrintEnabled(printEnabled);
         PrintDraftService.Result result = printDraftService.create(id, CurrentUser.id(), req.generated_asset_id(),
                 req.print_spec(), req.shipping_address());
         return ResponseEntity.status(HttpStatus.CREATED).body(toBody(result));

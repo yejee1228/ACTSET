@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Header } from '../components/Header';
 import { api, AssetItem, ProjectDetail } from '../lib/api';
 import { trackFunnelStep } from '../lib/funnel';
+import { useSystemStatus } from '../lib/systemStatus';
 
 interface ProjectDetailWithCounts extends ProjectDetail {
   flags: ProjectDetail['flags'] & { stale_info_count?: number; stale_design_count?: number };
@@ -23,6 +24,7 @@ export default function ProjectDashboardPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { data: status } = useSystemStatus();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [downloading, setDownloading] = useState(false);
   const [confirmingVisibility, setConfirmingVisibility] = useState(false);
@@ -113,7 +115,9 @@ export default function ProjectDashboardPage() {
             )}
           </div>
           <div style={{ display: 'flex', gap: 'var(--sp-2)' }}>
-            <Link to={`/projects/${id}/print`} className="btn btn-secondary">인쇄</Link>
+            {status?.print_enabled !== false && (
+              <Link to={`/projects/${id}/print`} className="btn btn-secondary">인쇄</Link>
+            )}
             <Link to={`/projects/${id}/edit`} className="btn btn-secondary">정보 수정</Link>
           </div>
         </div>

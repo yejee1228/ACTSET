@@ -26,8 +26,14 @@ public interface VisionAnalysisAdapter {
 
     BackdropCheck checkBackdrop(BufferedImage backdrop) throws Exception;
 
-    /** 요소 역할 판정 결과. index는 번호표 시트의 번호. */
-    record ElementLabel(int index, String role, String label) {
+    /**
+     * 요소 역할 판정 결과. index는 번호표 시트의 번호.
+     * text는 글자 요소에 적힌 문구 그대로(없으면 빈 값) — 인쇄 해상도에서 글꼴로 다시 쓸 때 쓴다.
+     */
+    record ElementLabel(int index, String role, String label, String text) {
+        public ElementLabel(int index, String role, String label) {
+            this(index, role, label, "");
+        }
     }
 
     /** 원본에 보이지만 요소로 떼어지지 않은 텍스트 — 자체 렌더링으로 다시 만든다. bbox는 원본 대비 상대좌표. */

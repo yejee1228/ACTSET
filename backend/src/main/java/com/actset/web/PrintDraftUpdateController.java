@@ -25,8 +25,12 @@ public class PrintDraftUpdateController {
     public record UpdateRequest(JsonNode print_spec, JsonNode shipping_address) {
     }
 
+    @org.springframework.beans.factory.annotation.Value("${actset.print.enabled:true}")
+    private boolean printEnabled;
+
     @PatchMapping("/api/v1/print-drafts/{draftId}")
     public Map<String, Object> update(@PathVariable UUID draftId, @RequestBody UpdateRequest req) {
+        PrintController.requirePrintEnabled(printEnabled);
         PrintDraftService.Result result = printDraftService.update(draftId, CurrentUser.id(), req.print_spec(), req.shipping_address());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("id", result.id().toString());

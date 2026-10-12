@@ -7,6 +7,7 @@ import com.actset.conversion.layout.FormatClassRule;
 import com.actset.conversion.layout.LayoutBlock;
 import com.actset.conversion.layout.LayoutLearner;
 import com.actset.conversion.layout.LayoutPlanner;
+import com.actset.conversion.layout.LayoutScorer;
 import com.actset.conversion.layout.TempLayoutPriors;
 import com.actset.format.FormatClass;
 import com.actset.format.FormatPreset;
@@ -107,6 +108,23 @@ class ConversionEnginesTest {
         List<LayoutPlanner.SourceElement> els = List.of(
                 el("bg", ElementRole.BACKDROP, 0, 0, 750, 1000),
                 el("info", ElementRole.INFO, 0, 900, 750, 10));
+        LayoutPlanner.Plan plan = new LayoutPlanner().plan(750, 1000, els,
+                TempLayoutPriors.forClass(FormatClass.LONG_LANDSCAPE), 2048, 256);
+        // 후보 중 하나(원본 구도 확대)가 정보 줄을 읽을 수 있게 키울 수 있다 — 들어갔다면 최소 크기 이상, 아니면 생략 기록
+        Rectangle2D info = plan.blockRects().get(LayoutBlock.INFO);
+        if (info != null) {
+            assertThat(info.getHeight()).isGreaterThanOrEqualTo(LayoutScorer.minTextPx(ElementRole.INFO));
+        } else {
+            assertThat(plan.dropped()).anyMatch(s -> s.startsWith("info"));
+        }
+    }
+
+    @Test
+    void 키울_수_없는_정보줄은_생략된다() {
+        // 원본 전체 폭(750)에 3px 높이 — 어떤 후보로도 최소 크기(12px)를 넘길 수 없다
+        List<LayoutPlanner.SourceElement> els = List.of(
+                el("bg", ElementRole.BACKDROP, 0, 0, 750, 1000),
+                el("info", ElementRole.INFO, 0, 900, 750, 3));
         LayoutPlanner.Plan plan = new LayoutPlanner().plan(750, 1000, els,
                 TempLayoutPriors.forClass(FormatClass.LONG_LANDSCAPE), 2048, 256);
         assertThat(plan.blockRects()).doesNotContainKey(LayoutBlock.INFO);

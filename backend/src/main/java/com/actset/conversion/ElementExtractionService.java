@@ -278,6 +278,8 @@ public class ElementExtractionService {
                 if (l.index() == i + 1) {
                     role = ElementRole.parse(l.role());
                     label = l.label();
+                    // 글자 요소의 문구 — 인쇄 해상도에서 글꼴로 다시 쓸 때 쓴다(해상도 개선, 2026-10-12)
+                    if (role.isText() && l.text() != null && !l.text().isBlank()) e.meta().put("text", l.text());
                 }
             }
             Extracted labeled = new Extracted(e.key(), role, e.origin(), label, e.image(), e.bounds(), e.z(), e.meta());
@@ -461,6 +463,39 @@ public class ElementExtractionService {
         ObjectNode meta = meta("text", 0);
         meta.put("text", t.text());
         return new Extracted(key, role, "rendered", "렌더링: " + t.text(), img, bounds, z, meta);
+    }
+
+    /**
+     * 저장된 요소의 역할만 다시 판정한다(분해·배경 재생성 없이 LLM 1회). 역할 정의가 바뀌었을 때 기존 프로젝트에 쓴다.
+     * 판정 대상은 extract()와 같다 — 배경판·자체 렌더링 글자를 뺀 요소를 큰 순서로 MAX_CLASSIFY개.
+     *
+     * @return 요소 id → 새 판정. 대상에서 빠진 작은 조각은 NOISE
+     */
+    public java.util.Map<String, ElementLabel> reclassify(BufferedImage poster, List<Extracted> elements) throws Exception {
+        BufferedImage original = ImageOps.toArgb(poster);
+        int w = original.getWidth(), h = original.getHeight();
+        List<Extracted> candidates = new ArrayList<>(elements.stream()
+                .filter(e -> e.role() != ElementRole.BACKDROP && !"rendered".equals(e.origin())).toList());
+        candidates.sort(Comparator.comparingInt((Extracted e) -> e.bounds().width * e.bounds().height).reversed());
+        List<Extracted> toClassify = candidates.subList(0, Math.min(MAX_CLASSIFY, candidates.size()));
+        List<BufferedImage> tiles = new ArrayList<>();
+        StringBuilder summary = new StringBuilder();
+        for (int i = 0; i < toClassify.size(); i++) {
+            Extracted e = toClassify.get(i);
+            tiles.add(e.image());
+            summary.append(String.format("#%d bbox(rel)=[%.2f,%.2f,%.2f,%.2f] source=%s%n", i + 1,
+                    e.bounds().x / (double) w, e.bounds().y / (double) h, e.bounds().getMaxX() / w, e.bounds().getMaxY() / h,
+                    e.origin()));
+        }
+        Classification cls = vision.classifyElements(original, ImageOps.numberedSheet(tiles, 220, 6), toClassify.size(),
+                summary.toString());
+        java.util.Map<String, ElementLabel> out = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < candidates.size(); i++) {
+            ElementLabel found = new ElementLabel(i + 1, "NOISE", i < MAX_CLASSIFY ? "판정 누락" : "작은 조각(판정 제외)");
+            for (ElementLabel l : cls.labels()) if (l.index() == i + 1) found = l;
+            out.put(candidates.get(i).key(), found);
+        }
+        return out;
     }
 
     /** 요소를 원래 자리에 다시 쌓은 재구성 — 분리가 정보 손실 없이 됐는지 원본과 비교한다. */

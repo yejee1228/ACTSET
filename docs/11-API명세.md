@@ -193,28 +193,37 @@ kind: performance_photo | cast_photo | logo | reference_image
 ```
 
 ### `GET /gallery`
-최소 목록(G-1). 인증 불필요 — 공개 콘텐츠다.
+목록(G-1). 인증 불필요 — 공개 콘텐츠다.
 
-`?genre=클래식&cursor=...&limit=20`
+`?genre=클래식&limit=24&offset=0` (limit 최대 60)
 
 ```json
-{ "items": [ { "project_id": "uuid", "main_title": "겨울 나그네", "genre": "클래식",
-               "primary_date": "2026-03-14", "thumbnail_url": "..." } ],
-  "next_cursor": null }
+{ "items": [ { "project_id": "uuid", "source": "self|kopis", "main_title": "겨울 나그네", "genre": "클래식",
+               "primary_date": "2026-03-14", "end_date": "2026-03-20", "venue_name": "...",
+               "thumbnail_url": "서명 URL 또는 KOPIS 원본 URL" } ],
+  "next_offset": 24 }
 ```
 
-`visibility='public' AND status='active'`인 프로젝트만 반환한다(Stage 10 `idx_projects_gallery` 참고). MVP는 KOPIS 시드 데이터를 포함하지 않는다(Stage 17).
+자체 공개 프로젝트(`visibility='public' AND status='active'`)를 먼저, 이어서 끝나지 않은 KOPIS 공연(공연중 → 공연예정, 개막일이 오늘에 가까운 순)을 붙인다. `next_offset`이 null이면 마지막 쪽. `genre=어린이공연`은 KOPIS 공연 중 아동 공연(child=Y)을 고른다. KOPIS 항목은 화면에 출처를 표시한다(docs/14 1-4).
 
 ### `GET /gallery/{project_id}`
-최소 상세(G-2). 인증 불필요.
+상세(G-2). 인증 불필요.
 
 ```json
-{ "project_id": "uuid", "main_title": "...", "genre": "...",
-  "primary_date": "...", "venue_name": "...",
-  "poster_preview_url": "..." }
+{ "project_id": "uuid", "source": "self|kopis", "main_title": "...", "genre": "...",
+  "primary_date": "...", "venue_name": "...", "poster_preview_url": "...",
+  // KOPIS 공연만
+  "end_date": "...", "state": "공연중", "area": "서울특별시", "kopis_genre": "서양음악(클래식)",
+  "detail": { "cast": "...", "runtime": "1시간", "age": "전체 관람가", "price": "전석 10,000원",
+              "schedule": "목요일(19:30)", "producer": null, "host": "...", "organizer": null,
+              "synopsis": "...", "childFriendly": false,
+              "introImages": ["https://kopis.or.kr/upload/..."],
+              "ticketLinks": [ { "name": "네이버N예약", "url": "https://..." } ] } }
 ```
 
-공연정보 중 어디까지 노출할지는 확인필요다(Stage 4·15 참고) — 출연진·가격 등 민감할 수 있는 필드는 MVP 응답에서 제외한다.
+자체 프로젝트는 출연진·가격 등 민감할 수 있는 필드를 내리지 않는다(Stage 4·15 확인필요). KOPIS 공연은 KOPIS가 공개한 정보라 상세 항목을 그대로 보여 준다.
+
+`GET /files/{encodedPath}?exp=&sig=`(서명 URL)는 로그인 없이 받을 수 있다 — 서명·만료가 곧 접근 권한이다(규칙 7). 로그인 없이 보는 Gallery의 포스터도 이 URL이다.
 
 ### `POST /projects/from-reference/{project_id}`
 "참고해서 내 포스터 만들기". 참고 대상의 스타일 속성만 추출해 새 draft 프로젝트 생성에 반영한다(Stage 5 4-2 참고).
@@ -412,6 +421,8 @@ kind: performance_photo | cast_photo | logo | reference_image
 프로젝트를 `active`로 확정하고, 포스터를 대표 포스터(`category='포스터'`, `format_code='CUSTOM'`)로 등록한 뒤 `analyze_poster` 작업을 등록한다. 다시 올리면 대표 포스터·요소를 교체한다. 분석 상태는 `GET /projects/{id}`의 `design_assets.analysis`(`pending`→`done`)와 `analysis_job_id`로 알 수 있다. **포스터가 외부 AI(분해·배경 검증·재생성·역할 판정)로 전송된다** — 화면에 고지한다(docs/15 결정 필요).
 
 이후 규격 변환은 기존 `POST /projects/{id}/recompose`를 그대로 쓴다. 업로드 포스터 프로젝트는 분석 전이면 `409 POSTER_ANALYZING`, 분석 후에는 규격별 하위 작업이 `format_convert`로 등록된다. `GET /projects` 목록 항목에 `source`가 추가됐다.
+
+> **베타 기간 인쇄 끔(2026-10-12 결정)** — 서버 설정 `ACTSET_PRINT_ENABLED=false`이면 아래 인쇄 API(print-renders·print-drafts 생성·수정)는 `503 PRINT_DISABLED`를 돌려준다. 베타 서버(t3.small, 메모리 2GB)가 인쇄 해상도 합성(X배너 한 장 약 4GB)을 못 버티기 때문. 프런트는 `GET /system/status`의 `print_enabled`로 인쇄 버튼을 숨긴다(`{ "maintenance": false, "message": "...", "print_enabled": false }`).
 
 ### `POST /projects/{id}/print-renders`
 ⑧에서 지정한 인쇄 크기(mm)·dpi로 레이어 스택을 재합성한다(5-3). 비주얼 레이어는 업스케일, 텍스트는 재렌더링, **PHOTO는 업로드 원본을 직접 재배치**한다(외부 업스케일러에 보내지 않는다 — Stage 5).
